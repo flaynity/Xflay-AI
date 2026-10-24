@@ -2410,8 +2410,8 @@ function activityCard(m){if(!m.activity||!m.activity.length)return '';
 function genCard(m){
  const gf=m.generatedFiles||[];if(!gf.length||m.ops)return '';
  const rows=gf.map((g,i)=>{const st=g.status||'generating',ex=(g.path.split('.').pop()||'').toLowerCase(),nm=g.path.split('/').pop().replace(/\.[^.]+$/,'')||g.path;
-  const code=st==='generating'?(genTail(m,g.path)||' ').slice(-30000):'';
-  return `<div class="gcard ${st}" data-gen="${i}"><div class="gc-top"><span class="gc-ic">&lt;/&gt;</span><div class="gc-tx"><b>${esc(nm.charAt(0).toUpperCase()+nm.slice(1))}</b><span>Code \u00b7 ${esc(GC_LANG[ex]||ex.toUpperCase()||'Text')}${g.stat?' \u00b7 '+(g.stat.created?'New':'Modified')+' +'+g.stat.add+' \u2212'+g.stat.del:''}</span></div>${st==='generating'?'<i class="gc-dot"></i>':'<span class="gc-go">'+icon('chev-r')+'</span>'}</div>${code?`<pre class="gc-code" data-gcp="${esc(g.path)}">${esc(code.slice(0,30000))}</pre>`:''}</div>`;}).join('');
+  const code='';
+  return `<div class="gcard ${st}" data-gen="${i}"><div class="gc-top"><span class="gc-ic">&lt;/&gt;</span><div class="gc-tx"><b>${esc(nm.charAt(0).toUpperCase()+nm.slice(1))}</b><span>Code \u00b7 ${esc(GC_LANG[ex]||ex.toUpperCase()||'Text')}${g.stat?' \u00b7 '+(g.stat.created?'New':'Modified')+' +'+g.stat.add+' \u2212'+g.stat.del:''}</span></div>${st==='generating'?'<span class="gc-st generating"><i class="gc-dot"></i>Generating</span>':'<span class="gc-go">'+icon('chev-r')+'</span>'}</div>${code?`<pre class="gc-code" data-gcp="${esc(g.path)}">${esc(code.slice(0,30000))}</pre>`:''}</div>`;}).join('');
  return `<div class="card gen gcards" data-gsig="${gf.map(g=>g.status).join('|')}">${rows}${m._genErr?`<div class="generr">${icon('alert','xs')}<span>${esc(m._genErr)}</span></div>`:''}</div>`;}
 const GC_LANG={html:'HTML',js:'JavaScript',kt:'Kotlin',java:'Java',css:'CSS',json:'JSON',xml:'XML',py:'Python',ts:'TypeScript',md:'Markdown',gradle:'Gradle',kts:'Kotlin Script'};
 function genTail(m,path){const c=m.content||'',i=c.indexOf('```flayfiles');if(i<0)return '';const body=c.slice(i);const pi=body.indexOf(JSON.stringify(path).slice(0,-1));if(pi<0)return '';const ci=body.slice(pi).search(/"content"\s*:\s*"/);if(ci<0)return '';let t=body.slice(pi+ci).replace(/^"content"\s*:\s*"/,'');let e=0;while(e<t.length){if(t[e]==='\\')e+=2;else if(t[e]==='"')break;else e++;}t=t.slice(0,e);if(t.endsWith('\\'))t=t.slice(0,-1);try{return JSON.parse('"'+t+'"');}catch(_){return t.replace(/\\n/g,'\n').replace(/\\t/g,'\t').replace(/\\"/g,'"').replace(/\\\\/g,'\\');}}
@@ -3533,6 +3533,23 @@ function bundleHtml(path,files,seen=new Set()){if(seen.has(path))return '';seen.
  html=html.replace(/\b(src|href)=["']([^"']+)["']/gi,(m,at,ref)=>{const p2=resolve(ref);
   if(p2&&files[p2]&&files[p2].binary&&/^data:image/.test(files[p2].content))return at+'="'+files[p2].content+'"';return m;});
  return html;}
+
+const HL_KW=/\b(?:function|const|let|var|return|if|else|for|while|do|class|import|export|from|new|this|async|await|fun|val|package|public|private|protected|static|final|void|int|long|float|double|String|boolean|true|false|null|undefined|try|catch|finally|switch|case|break|continue|extends|implements|interface|override|def|in|is|as|object|when|throw|typeof|default|enum|struct|self|None|True|False|lambda|with|yield|super|abstract|data|sealed|companion|init|get|set|of)\b/.source;
+function hlCode(text,ext){
+ ext=(ext||'').toLowerCase();
+ const markup=['html','htm','xml','svg'].includes(ext),hash=['py','sh','yml','yaml','properties','toml'].includes(ext),css=ext==='css',plain=['md','txt','json'].includes(ext);
+ const parts=[['cm','\\/\\*[\\s\\S]*?(?:\\*\\/|$)'],['cm',markup?'<!--[\\s\\S]*?(?:-->|$)':null],['cm',(!css&&!hash&&!plain)?'\\/\\/[^\\n]*':null],['cm',hash?'#[^\\n]*':null],
+  ['st','"(?:\\\\.|[^"\\\\\\n])*"?'],['st',"'(?:\\\\.|[^'\\\\\\n])*'?"],['st',(!css&&!markup)?'`(?:\\\\[\\s\\S]|[^`\\\\])*`?':null],
+  ['tg',markup?'<\\/?[A-Za-z][\\w:-]*|\\/?>':null],['at',markup?'\\b[A-Za-z_:][\\w:.-]*(?==)':null],
+  ['pr',css?'[a-z-]+(?=\\s*:)':null],['nm','#[0-9a-fA-F]{3,8}\\b|\\b\\d+(?:\\.\\d+)?(?:px|em|rem|%|dp|sp|vh|vw)?\\b'],['kw',(markup||css||plain&&ext!=='json')?null:HL_KW],['kw',ext==='json'?'\\b(?:true|false|null)\\b':null]].filter(x=>x[1]);
+ const re=new RegExp(parts.map(x=>'('+x[1]+')').join('|'),'g'),cls=parts.map(x=>x[0]);
+ const E=t=>t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+ let out='',last=0,m;
+ const wrap=(c,t)=>t.split('\n').map(l=>l?'<span class="t-'+c+'">'+E(l)+'</span>':'').join('\n');
+ while((m=re.exec(text))){if(m[0]==='')break;out+=E(text.slice(last,m.index));let k=1;while(m[k]===undefined)k++;out+=wrap(cls[k-1],m[0]);last=m.index+m[0].length;}
+ out+=E(text.slice(last));
+ return out.split('\n').map(l=>'<span class="ln">'+l+'</span>').join('');}
+function setVwCode(el,text,ext){try{if(text.length>400000)throw 0;el.innerHTML=hlCode(text,ext);}catch(_){el.textContent=text;}}
 function openViewerFile(f,ctxFiles){
  const name=f.name;const ext=(name.split('.').pop()||'').toLowerCase();
  const canPreview=['html','htm'].includes(ext)||IMG_EXT.includes(ext)||ext==='md'||ext==='json';
@@ -3546,7 +3563,7 @@ function openViewerFile(f,ctxFiles){
   </header>
   <div class="vw-body"><pre class="vw-code" id="vwCode"></pre><div class="vw-preview hidden" id="vwPrev"></div></div></div>`;
  v.classList.add('show');
- $('#vwCode').textContent=f.binary?(f.content||''):(f.content||'');
+ setVwCode($('#vwCode'),f.content||'',f.binary?'txt':ext);
  $('#vwClose').onclick=closeViewer;
  $('#vwCopy').onclick=async()=>{await copyText(f.content||'');const b=$('#vwCopy');b.innerHTML=icon('check','xs')+'<span>Copied</span>';setTimeout(()=>b.innerHTML=icon('copy','xs')+'<span>Full Copy</span>',1400);};
  $('#vwSeg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.disabled)return;
@@ -3574,7 +3591,7 @@ function openLiveViewer(msg,g){
   if(!el||!v.classList.contains('show')||v.dataset.live!==g.path){clearInterval(window._liveT);return;}
   const done=g.status!=='generating';
   const t=done?(g.content||genTail(msg,g.path)||''):genTail(msg,g.path);
-  if(t&&t.length!==last){last=t.length;const atEnd=el.scrollHeight-el.scrollTop-el.clientHeight<80||!done;el.textContent=t;if(atEnd){el.scrollTop=el.scrollHeight;const pb=el.parentNode;if(pb)pb.scrollTop=pb.scrollHeight;}}
+  if(t&&t.length!==last){last=t.length;const atEnd=el.scrollHeight-el.scrollTop-el.clientHeight<80||!done;setVwCode(el,t,(g.path.split('.').pop()||''));if(atEnd){el.scrollTop=el.scrollHeight;const pb=el.parentNode;if(pb)pb.scrollTop=pb.scrollHeight;}}
   if(done){clearInterval(window._liveT);v.dataset.live='';}
  },120);}
 function openViewer(path){const p=S.project;const f=p.files[path];if(!f)return;
@@ -5808,7 +5825,15 @@ window.__codingAgent={execTool,parseCall,visible,build,changedList,snapBase,chkJ
 .zip-l{overflow:auto;display:flex;flex-direction:column;gap:8px;padding-bottom:env(safe-area-inset-bottom)}
 .zip-r{display:flex;align-items:center;gap:12px;padding:8px 10px;border-radius:20px;background:#1b1b1f;border:1px solid rgba(255,255,255,.08);color:#fff;text-align:left}
 .zip-r .ca-dl-t b{font-size:15px}.zip-r .ca-dl-t i{font-size:12px}
-</script>    
-</body>    
-</html>
 
+/* code viewer: line numbers, colors, top position */
+#viewer .ov-body{padding-top:0!important}
+#viewer .topbar{padding-top:calc(env(safe-area-inset-top) + 2px)!important;min-height:50px}
+.vw-code{counter-reset:ln;color:#d6deeb;background:#0b0d12!important;padding:12px 14px 40px 0!important;tab-size:2}
+.vw-code .ln{display:block;counter-increment:ln;min-height:1.6em;padding-left:calc(3.6ch + 26px);position:relative}
+.vw-code .ln::before{content:counter(ln);position:absolute;left:0;width:3.6ch;margin-left:10px;text-align:right;color:#4b5263;user-select:none}
+.t-cm{color:#6b7a90;font-style:italic}.t-st{color:#c3e88d}.t-nm{color:#f78c6c}.t-kw{color:#c792ea}.t-tg{color:#ff6b81}.t-at{color:#ffcb6b}.t-pr{color:#82aaff}
+[data-theme=light] .vw-code{background:#f7f8fb!important;color:#2b3040}
+[data-theme=light] .t-cm{color:#8a94a6}[data-theme=light] .t-st{color:#2e8b3d}[data-theme=light] .t-nm{color:#d4572b}[data-theme=light] .t-kw{color:#8a3fc7}[data-theme=light] .t-tg{color:#d6264a}[data-theme=light] .t-at{color:#b7791f}[data-theme=light] .t-pr{color:#2f5fd0}
+.gc-st.generating{color:#ff9a2e;font-size:13px;font-weight:600;margin-right:2px}.gcard .gc-st .gc-dot{margin:0}
+</script>    
