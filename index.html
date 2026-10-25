@@ -845,7 +845,6 @@ body.auth-open #toasts{z-index:6000}
 <div class="screen active" id="screen-chat" style="z-index:10">
   <header class="ftop">
     <button class="fbtn" id="btnMenu" aria-label="Menu"><svg class="ic"><use href="#i-menu"/></svg></button>
-    <button class="mtop" id="topModel" aria-haspopup="dialog" aria-label="Select model"><span>Select model</span><svg class="ic"><use href="#i-chev-d"/></svg></button>
     <button class="fbtn" id="btnNewChat" aria-label="New chat"><svg class="ic"><use href="#i-newchat"/></svg></button>
   </header>
   <div id="chatScroll"><div class="msgs" id="msgs"></div></div>
@@ -861,6 +860,7 @@ body.auth-open #toasts{z-index:6000}
         <button class="cbtn" id="chipWeb" aria-label="Web access"><svg class="ic sm"><use href="#i-globe"/></svg></button>
         <button class="cmode" id="chipMode" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Mode: Auto"><svg class="ic"><use href="#i-crown"/></svg><span>Auto</span></button>
         <div class="cgrow"></div>
+        <button class="cmodel" id="topModel" type="button" aria-haspopup="dialog" aria-label="Select model"><svg class="ic mfb" aria-hidden="true"><use href="#i-chip"/></svg><svg class="ic chev" aria-hidden="true"><use href="#i-chev-d"/></svg></button>
         <button class="mchip" id="chipModel" aria-label="Reasoning effort"><svg class="ic"><use href="#i-brain"/></svg><span>Reasoning</span></button>
         <button class="cbtn send" id="btnSend" aria-label="Send"><svg class="ic"><use href="#i-send"/></svg></button>
       </div>
@@ -2069,19 +2069,26 @@ async function providerChat(o){const p=o.provider;if(!p)throw new Error('No AI p
  const headers={'Content-Type':'application/json'};if(p.apiKey)headers.Authorization='Bearer '+p.apiKey;
  const body={model:o.model||p.model,messages:o.messages,temperature:o.temperature??p.temperature??0.7,max_tokens:o.maxTokens??p.maxTokens??4096,stream:!!(o.stream??p.stream)};
  const rs=o.reasoning||S.settings.reasoning;if(p.supportsReasoning&&rs&&rs!=='off'){body.reasoning_effort={fast:'low',balanced:'medium',deep:'high',extra:'high',max:'high'}[rs]||'medium';}
- let res;try{res=await fetch(chatUrl(p.baseUrl),{method:'POST',headers,body:JSON.stringify(body),signal:o.signal});}
- catch(e){if(e.name==='AbortError')throw e;throw new Error('Network error: '+(e.message||'request failed')+' (CORS, offline, or wrong URL)');}
- if(!res.ok){let t='';try{t=await res.text()}catch(_){}throw new Error(describeHttp(res.status,t));}
- if(!body.stream||!res.body){const j=await res.json();const m=(j.choices&&j.choices[0]&&j.choices[0].message)||{};const c=m.content||'';
+ const ac=new AbortController();let timedOut=false;
+ if(o.signal){if(o.signal.aborted)ac.abort();else o.signal.addEventListener('abort',()=>ac.abort(),{once:true});}
+ const waitMs=body.stream?(o.connectMs||45000):(o.waitMs||180000),hdr=setTimeout(()=>{timedOut=true;ac.abort();},waitMs);
+ const tmo=()=>new Error('Network error: the provider did not respond within '+Math.round(waitMs/1000)+'s');
+ let res;try{res=await fetch(chatUrl(p.baseUrl),{method:'POST',headers,body:JSON.stringify(body),signal:ac.signal});}
+ catch(e){clearTimeout(hdr);if(timedOut)throw tmo();if(e.name==='AbortError')throw e;throw new Error('Network error: '+(e.message||'request failed')+' (CORS, offline, or wrong URL)');}
+ if(body.stream)clearTimeout(hdr);
+ if(!res.ok){clearTimeout(hdr);let t='';try{t=await res.text()}catch(_){}throw new Error(describeHttp(res.status,t));}
+ if(!body.stream||!res.body){let j;try{j=await res.json();}catch(e){clearTimeout(hdr);if(timedOut)throw tmo();throw e;}clearTimeout(hdr);const m=(j.choices&&j.choices[0]&&j.choices[0].message)||{};const c=m.content||'';
   if(o.onDelta&&c)o.onDelta(c);if(o.onReasoning&&(m.reasoning_content||m.reasoning))o.onReasoning(m.reasoning_content||m.reasoning);return c;}
- const reader=res.body.getReader(),dec=new TextDecoder();let buf='';const IDLE=o.idleMs||120000;
- const rd=()=>new Promise((ok,no)=>{const t=setTimeout(()=>{try{reader.cancel();}catch(_){}no(new Error('Network error: the provider stopped responding for '+Math.round(IDLE/1000)+'s'));},IDLE);reader.read().then(v=>{clearTimeout(t);ok(v);},e=>{clearTimeout(t);no(e);});});
+ const reader=res.body.getReader(),dec=new TextDecoder();let buf='';const IDLE=o.idleMs||25000,FIRST=o.firstMs||90000;let started=false,thinkT=0,gotC=false;
+ const rsel=o.reasoning||S.settings.reasoning,BUD=o.thinkMs||({off:12000,fast:20000,balanced:20000,deep:45000,extra:90000,max:150000}[rsel]||20000);
+ const rd=()=>{const lim=started?IDLE:FIRST;return new Promise((ok,no)=>{const t=setTimeout(()=>{try{reader.cancel();}catch(_){}no(new Error('Network error: the provider stopped responding for '+Math.round(lim/1000)+'s'));},lim);reader.read().then(v=>{clearTimeout(t);ok(v);},e=>{clearTimeout(t);no(e);});});};
  const one=line=>{line=line.trim();if(!line.startsWith('data:'))return false;const data=line.slice(5).trim();if(data==='[DONE]')return true;
   let j;try{j=JSON.parse(data)}catch(_){return false}
   const d=(j.choices&&j.choices[0]&&j.choices[0].delta)||{};const r=d.reasoning_content||d.reasoning||'';const c=d.content||'';
-  if(r&&o.onReasoning)o.onReasoning(r);if(c&&o.onDelta)o.onDelta(c);return false;};
- while(true){const{done,value}=await rd();if(done)break;buf+=dec.decode(value,{stream:true});
-  let i;while((i=buf.indexOf('\n'))>=0){const line=buf.slice(0,i);buf=buf.slice(i+1);if(one(line))return '';}}
+  if(r){if(!thinkT)thinkT=Date.now();if(o.onReasoning)o.onReasoning(r);}if(c){gotC=true;if(o.onDelta)o.onDelta(c);}return false;};
+ while(true){const{done,value}=await rd();if(done)break;started=true;buf+=dec.decode(value,{stream:true});
+  let i;while((i=buf.indexOf('\n'))>=0){const line=buf.slice(0,i);buf=buf.slice(i+1);if(one(line))return '';}
+  if(o.thinkBudget&&thinkT&&!gotC&&Date.now()-thinkT>BUD){try{reader.cancel();}catch(_){}const e=new Error('The model kept thinking for too long.');e.thinkBudget=true;throw e;}}
  if(buf.trim())one(buf);
  return '';}
 async function fetchModels(p){const h={};if(p.apiKey)h.Authorization='Bearer '+p.apiKey;
@@ -2633,7 +2640,7 @@ function renderAtts(){const host=$('#chatAtts');
 $('#chatAtts').addEventListener('click',e=>{const b=e.target.closest('[data-rmatt]');if(b){S.pendingAttachments.splice(+b.dataset.rmatt,1);renderAtts();}});
 
 /* ---------- system prompts ---------- */
-const THINK_RULE='Reasoning speed: think ultra fast. Keep your private reasoning short - at most 3 to 5 steps, each a brief bold title line plus one short sentence. Never over-think simple requests.';
+const THINK_RULE='Reasoning speed: think ULTRA fast. Your private reasoning must be tiny: at most 3 short lines (under 60 words in total), then act or answer at once. Never deliberate, never re-check things you already know, never plan twice. Simple requests need no reasoning at all.';
 const LINKS_RULE='When the user asks for website link(s) (a site, service, tool, platform, ad network, store, etc.), the application may perform live web research and supply LIVE WEB CONTEXT. Reply directly in the user\'s language. If usable live sources are available, present those results and only use URLs that appear in those sources. Do NOT say "I don\'t have a web-search tool of my own" or make contradictory statements. Output exactly one fenced code block tagged weblinks containing a JSON array of 3 to 8 items (one item if the user asks for one specific site), each shaped like {"name":"Google AdSense","tag":"short category line in the user\'s language","desc":"one or two sentences in the user\'s language","url":"https://official-site.example","open":"short label in the user\'s language"}. If search returns FAILED or NO USABLE RESULTS, state clearly that live verification failed; do not claim any URL was live-verified. For well-known services whose official domain is highly certain from stable knowledge, you MAY provide exact known domains as clearly UNVERIFIED fallback links in the same weblinks block (for example Google AdSense: https://adsense.google.com/, Media.net: https://www.media.net/, PropellerAds: https://propellerads.com/, Adsterra: https://adsterra.com/, Ezoic: https://www.ezoic.com/). Label each fallback as not live-verified. Never guess unfamiliar domains or invent URLs; if uncertain, provide no link. Do not write raw URLs outside the block.';
 function isLinkIntent(t){t=String(t||'').trim();if(!t||t.length>400)return false;
  const noun=/(\blinks?\b|\burls?\b|\bweb\s?sites?\b|\bsites?\b|\u09b2\u09bf\u0982\u0995|\u09b2\u09bf\u0999\u09cd\u0995|\u0993\u09af\u09bc\u09c7\u09ac\u09b8\u09be\u0987\u099f|\u0993\u09af\u09bc\u09c7\u09ac \u09b8\u09be\u0987\u099f|\u09b8\u09be\u0987\u099f)/i;
@@ -5620,10 +5627,17 @@ function build(system,L){
  return out;}
 
 /* ---------- model call ---------- */
+const FAST_NOTE='\n\nIMPORTANT: your previous attempt was cut off because it thought for too long. Do not deliberate. Use at most two short lines of private reasoning, then act or answer immediately.';
+function withFast(msgs){const m=(msgs||[]).slice();if(m[0]&&m[0].role==='system'&&typeof m[0].content==='string')m[0]=Object.assign({},m[0],{content:m[0].content+FAST_NOTE});return m;}
 async function modelCall(o){
+ let fast=false;
  for(let a=0;;a++){let got=false;
-  try{return await providerChat(Object.assign({provider:activeProvider(),reasoning:fastThink()},o,{onDelta:d=>{got=true;o.onDelta&&o.onDelta(d);}}));}
-  catch(e){if(e.name==='AbortError')throw e;const tr=/HTTP (429|5\d\d)|Network error/.test(String(e.message||''));if(!tr||a>=2||got)throw e;await sleep(Math.min(8000,1000*Math.pow(2,a)),o.signal);}}}
+  try{return await providerChat(Object.assign({provider:activeProvider(),reasoning:fastThink(),thinkBudget:true},o,{messages:fast?withFast(o.messages):o.messages,onDelta:d=>{got=true;o.onDelta&&o.onDelta(d);}}));}
+  catch(e){if(e.name==='AbortError')throw e;const msg=String(e.message||''),tb=!!e.thinkBudget,stall=/stopped responding|did not respond/.test(msg),tr=/HTTP (429|5\d\d)|Network error/.test(msg);
+   if((!tb&&!tr)||a>=2||got)throw e;
+   if(tb||stall)fast=true;
+   if(o.onRetry)o.onRetry(tb?'thinking too long':stall?'no response':'server error');
+   await sleep(tb?0:Math.min(4000,800*Math.pow(2,a)),o.signal);}}}
 async function step(o,L){
  const am=o.am,sel=o.sel,ctl=new AbortController();let buf='',cut=false;
  const onAb=()=>ctl.abort();o.signal.addEventListener('abort',onAb,{once:true});
@@ -5631,7 +5645,8 @@ async function step(o,L){
  try{await modelCall({messages:build(o.system,L),signal:ctl.signal,
    onDelta:d=>{buf+=d;const v=visible(buf);if(v!==am.content){am.content=v;updateLive(am,sel);}
     if(!cut&&(/TOOL_CALL/i.test(buf)||DSML_OPEN.test(buf))&&parseCall(buf).kind==='call'){cut=true;ctl.abort();}},
-   onReasoning:r=>{if(!am.thinkT0)am.thinkT0=Date.now();am.reasoning=((am.reasoning||'')+r).slice(-20000);updateLive(am,sel);}});}
+   onReasoning:r=>{if(!am.thinkT0)am.thinkT0=Date.now();am.reasoning=((am.reasoning||'')+r).slice(-20000);updateLive(am,sel);},
+   onRetry:why=>{buf='';am.reasoning='';am.thinkT0=0;act(am,sel,'Model was slow ('+why+'), retrying with faster thinking','alert','warn');}});}
  catch(e){if(!(e.name==='AbortError'&&cut&&!o.signal.aborted))throw e;}
  finally{o.signal.removeEventListener('abort',onAb);}
  return buf;}
@@ -5982,8 +5997,8 @@ window.__codingAgent={execTool,parseCall,visible,build,changedList,snapBase,chkJ
 :root:root .composer .cmodel .ic.chev{width:14px;height:14px;color:#8d8d93}
 :root:root .composer .cgrow{flex:1;min-width:0}
 /* narrow screens: keep everything on one row */
-@media (max-width:379px){:root:root .composer .mchip span{display:none}:root:root .composer .mchip{padding:0 11px}}
-@media (max-width:429px){:root:root #pjAgent .composer .mchip span{display:none}:root:root #pjAgent .composer .mchip{padding:0 11px}:root:root #pjAgent .composer .cmodel .ic.chev{display:none}:root:root #pjAgent .composer .cbtn{width:38px;height:38px}:root:root #pjAgent .composer .cmode,:root:root #pjAgent .composer .mchip,:root:root #pjAgent .composer .cmodel{height:38px}:root:root #pjAgent .composer .cmode{padding:0 10px;gap:5px}:root:root #pjAgent .composer .cbtn.send{width:42px;height:42px}}
+@media (max-width:429px){:root:root .composer .mchip span{display:none}:root:root .composer .mchip{padding:0 11px}:root:root .composer .cmodel .ic.chev{display:none}:root:root .composer .cbtn{width:38px;height:38px}:root:root .composer .cmode,:root:root .composer .mchip,:root:root .composer .cmodel{height:38px}:root:root .composer .cmode{padding:0 10px;gap:5px}:root:root .composer .cbtn.send{width:42px;height:42px}}
+#screen-chat .ftop>#btnNewChat{margin-left:auto!important}
 /* Project Workspace > Agent tab: no top model bar any more */
 #screen-project #pjAgent>.scrollpane{padding-top:86px!important}
 /* ===== Add to chat sheet ===== */
@@ -6061,4 +6076,4 @@ paint();
 })();
 </script>
 </body>
-</html>
+</html
