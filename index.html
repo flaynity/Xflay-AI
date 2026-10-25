@@ -772,6 +772,11 @@ body.auth-open #toasts{z-index:6000}
 </defs></svg>
 <svg style="display:none" xmlns="http://www.w3.org/2000/svg">
 <symbol id="i-menu" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16"/></symbol>
+<symbol id="i-camera" viewBox="0 0 24 24"><path d="M14.5 4h-5L8 6H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-3Z"/><circle cx="12" cy="12.5" r="3.5"/></symbol>
+<symbol id="i-crown" viewBox="0 0 24 24"><path d="M3 8l4.5 4L12 5l4.5 7L21 8l-2 11H5Z"/><path d="M5.5 21h13"/></symbol>
+<symbol id="i-plan" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="m3.5 6 1.2 1.2L6.6 5M3.5 12l1.2 1.2L6.6 11M3.5 18l1.2 1.2L6.6 17"/></symbol>
+<symbol id="i-hammer" viewBox="0 0 24 24"><path d="m14 13 6.5 6.5a2.1 2.1 0 0 1-3 3L11 16"/><path d="m11.5 15.5-1.8 1.8"/><path d="M6.5 10.5 15 2l4 4-3 3-1.5-1.5-3 3"/><path d="m3 13 4-4"/></symbol>
+<symbol id="i-connectors" viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1.8"/><rect x="3" y="13" width="8" height="8" rx="1.8"/><rect x="13" y="13" width="8" height="8" rx="1.8"/><rect x="14.5" y="3" width="5.5" height="5.5" rx="1.4"/></symbol>
 <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
 <symbol id="i-clip" viewBox="0 0 24 24"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></symbol>
 <symbol id="i-file" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M15 2v5h5"/></symbol>
@@ -849,16 +854,14 @@ body.auth-open #toasts{z-index:6000}
     <div class="atts hidden" id="chatAtts"></div>
     <div class="cbox2">
       <div class="c-input-row">
-        <span class="c-spark"><svg class="ic xs fill"><use href="#i-spark"/></svg></span>
         <textarea id="chatInput" rows="1" placeholder="Ask Flay"></textarea>
       </div>
       <div class="crow">
         <button class="cbtn" id="btnPlus" aria-label="Attach"><svg class="ic"><use href="#i-plus"/></svg></button>
-        <button class="cbtn" id="chipWeb" aria-label="Web"><svg class="ic sm"><use href="#i-globe"/></svg></button>
-        <button class="wm-btn" type="button" aria-label="Mode"><span>New</span><svg class="ic xs"><use href="#i-chev-d"/></svg></button>
-        <span class="c-sep"></span>
+        <button class="cbtn" id="chipWeb" aria-label="Web access"><svg class="ic sm"><use href="#i-globe"/></svg></button>
+        <button class="cmode" id="chipMode" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Mode: Auto"><svg class="ic"><use href="#i-crown"/></svg><span>Auto</span></button>
         <div class="cgrow"></div>
-        <button class="cbtn brain-btn" id="chipModel" aria-label="Reasoning effort" title="Reasoning effort"><svg class="ic"><use href="#i-brain"/></svg><span>Reasoning</span></button>
+        <button class="mchip" id="chipModel" aria-label="Reasoning effort"><svg class="ic"><use href="#i-brain"/></svg><span>Reasoning</span></button>
         <button class="cbtn send" id="btnSend" aria-label="Send"><svg class="ic"><use href="#i-send"/></svg></button>
       </div>
     </div>
@@ -1059,17 +1062,15 @@ body.auth-open #toasts{z-index:6000}
       <div class="atts hidden" id="agentAtts"></div>
       <div class="cbox2">
         <div class="c-input-row">
-          <span class="c-spark"><svg class="ic xs fill"><use href="#i-spark"/></svg></span>
           <textarea id="agentInput" rows="1" placeholder="Ask Flay"></textarea>
         </div>
         <div class="crow">
           <button class="cbtn" id="agentPlus" aria-label="Attach"><svg class="ic"><use href="#i-plus"/></svg></button>
-          <button class="cbtn" id="chipWeb2" aria-label="Web"><svg class="ic sm"><use href="#i-globe"/></svg></button>
-          <button class="wm-btn" type="button" aria-label="Mode"><span>New</span><svg class="ic xs"><use href="#i-chev-d"/></svg></button>
-          <span class="c-sep"></span>
+          <button class="cbtn" id="chipWeb2" aria-label="Web access"><svg class="ic sm"><use href="#i-globe"/></svg></button>
+          <button class="cmode" id="chipMode2" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Mode: Auto"><svg class="ic"><use href="#i-crown"/></svg><span>Auto</span></button>
           <div class="cgrow"></div>
-          <button class="pjmodel" id="topModel2" aria-haspopup="dialog" aria-label="Select model"><span>Select model</span><svg class="ic"><use href="#i-chev-d"/></svg></button>
-          <button class="cbtn brain-btn" id="chipModel2" aria-label="Reasoning effort" title="Reasoning effort"><svg class="ic"><use href="#i-brain"/></svg><span>Reasoning</span></button>
+          <button class="cmodel" id="topModel2" type="button" aria-haspopup="dialog" aria-label="Select model"><svg class="ic mfb" aria-hidden="true"><use href="#i-chip"/></svg><svg class="ic chev" aria-hidden="true"><use href="#i-chev-d"/></svg></button>
+          <button class="mchip" id="chipModel2" aria-label="Reasoning effort"><svg class="ic"><use href="#i-brain"/></svg><span>Reasoning</span></button>
           <button class="cbtn send" id="agentSend" aria-label="Send"><svg class="ic"><use href="#i-send"/></svg></button>
         </div>
       </div>
@@ -1169,13 +1170,21 @@ body.auth-open #toasts{z-index:6000}
 <!-- ATTACHMENT SHEET -->
 <div class="overlay" id="sheetWrap">
   <div class="sheet-scrim" data-sheet-close></div>
-  <div class="sheet">
-    <div class="sheet-grip"></div>
-    <div class="sheet-title" id="sheetTitle">Add to message</div>
-    <button class="sheet-item hidden" id="shPFiles"><svg class="ic"><use href="#i-folder"/></svg><span>Attach project files (select from Code)</span></button>
-    <button class="sheet-item" id="shPhoto"><svg class="ic"><use href="#i-image"/></svg><span>Photo</span></button>
-    <button class="sheet-item" id="shFile"><svg class="ic"><use href="#i-file"/></svg><span>File</span></button>
-    <button class="sheet-item" id="shPlugins"><svg class="ic"><use href="#i-tools"/></svg><span>Plugins</span></button>
+  <div class="sheet atc-sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+    <div class="atc-grip"></div>
+    <div class="atc-head">
+      <button class="atc-x" type="button" data-sheet-close aria-label="Close"><svg class="ic"><use href="#i-x"/></svg></button>
+      <div class="atc-title" id="sheetTitle">Add to chat</div>
+      <span class="atc-x-sp"></span>
+    </div>
+    <div class="atc-tiles">
+      <button class="atc-tile" id="shCamera" type="button"><span class="atc-ico"><svg class="ic"><use href="#i-camera"/></svg></span><b>Camera</b></button>
+      <button class="atc-tile" id="shPhoto" type="button"><span class="atc-ico"><svg class="ic"><use href="#i-image"/></svg></span><b>Photos</b></button>
+      <button class="atc-tile" id="shFile" type="button"><span class="atc-ico"><svg class="ic"><use href="#i-file"/></svg></span><b>Files</b></button>
+    </div>
+    <button class="atc-row hidden" id="shPFiles" type="button"><span class="atc-ico"><svg class="ic"><use href="#i-folder"/></svg></span><b>Project files</b><span class="atc-go"><svg class="ic"><use href="#i-chev-r"/></svg></span></button>
+    <button class="atc-row" id="shWeb" type="button" role="switch" aria-checked="false"><span class="atc-ico"><svg class="ic"><use href="#i-globe"/></svg></span><b>Web search</b><span class="atc-sw"><i></i></span></button>
+    <button class="atc-row" id="shPlugins" type="button"><span class="atc-ico"><svg class="ic"><use href="#i-connectors"/></svg></span><b>Connectors</b><span class="atc-go"><svg class="ic"><use href="#i-chev-r"/></svg></span></button>
   </div>
 </div>
 
@@ -1184,6 +1193,7 @@ body.auth-open #toasts{z-index:6000}
 <div id="toasts"></div>
 
 <input type="file" id="filePickPhoto" hidden multiple accept="image/*">
+<input type="file" id="filePickCamera" hidden accept="image/*" capture="environment">
 <input type="file" id="filePickFile" hidden multiple accept=".zip,.html,.htm,.css,.js,.ts,.jsx,.tsx,.json,.xml,.py,.java,.kt,.c,.cpp,.php,.sql,.md,.txt,.png,.jpg,.jpeg,.webp,.gif,.svg,.pdf,.gradle,.properties,.pro,.kts">
 <input type="file" id="filePickAgent" hidden multiple accept=".html,.htm,.css,.js,.ts,.json,.xml,.md,.txt,.kt,.java,.gradle,.kts,.properties">
 <input type="file" id="zipPick" hidden accept=".zip">
@@ -1895,12 +1905,12 @@ Cloud.onError=(()=>{let t=0;return e=>{const n=Date.now();if(n-t>8000){t=n;toast
 const S={settings:{providers:[],selectedProviderId:null,reasoning:'balanced'},
  chats:[],chat:null,projects:[],project:null,navStack:[],
  streaming:false,abort:null,agentStreaming:false,agentAbort:null,
- pendingAttachments:[],agentAttachments:[],webAccess:false,selection:null,expanded:new Set(),techSel:null,appDraft:null,sheetTarget:'chat',pinned:true,zipMode:'new'};
+ pendingAttachments:[],agentAttachments:[],agentMode:'auto',webAccess:false,selection:null,expanded:new Set(),techSel:null,appDraft:null,sheetTarget:'chat',pinned:true,zipMode:'new'};
 const activeProvider=()=>S.settings.providers.find(p=>p.id===S.settings.selectedProviderId)||S.settings.providers[0]||null;
-function saveSettings(){try{Cloud.saveSettings({providers:S.settings.providers,selectedProviderId:S.settings.selectedProviderId,reasoning:S.settings.reasoning,lastChatId:S.chat?S.chat.id:null});}catch(e){}}
+function saveSettings(){try{Cloud.saveSettings({providers:S.settings.providers,selectedProviderId:S.settings.selectedProviderId,reasoning:S.settings.reasoning,agentMode:S.agentMode||'auto',lastChatId:S.chat?S.chat.id:null});}catch(e){}}
 function loadSettings(){try{const s=Cloud.settings||{};
  if(s.providers)S.settings.providers=s.providers;
- if(s.selectedProviderId)S.settings.selectedProviderId=s.selectedProviderId;if(s.reasoning)S.settings.reasoning=s.reasoning;}catch(e){}}
+ if(s.selectedProviderId)S.settings.selectedProviderId=s.selectedProviderId;if(s.reasoning)S.settings.reasoning=s.reasoning;if(s.agentMode==='auto'||s.agentMode==='plan'||s.agentMode==='build')S.agentMode=s.agentMode;}catch(e){}}
 function applyTheme(){document.documentElement.setAttribute('data-theme','dark');}
 const persistChat=()=>S.chat&&DB.put('chats',S.chat);
 const persistProject=(p=S.project)=>p&&DB.put('projects',p);
@@ -2612,9 +2622,9 @@ function updateChips(){const p=activeProvider();
  ['#topModel','#topModel2'].forEach(s=>{const el=$(s);if(!el)return;
   if(nm){const b=mpBrand(nm)||mpBrand(p&&p.name)||'';
    el.classList.add('logo-only');el.setAttribute('aria-label','Model: '+nm);el.title=nm;
-   el.innerHTML=(b?'<svg class="mlogo" data-b="'+b+'" aria-hidden="true"><use href="#l-'+b+'"/></svg>':'<svg class="ic mfb" aria-hidden="true"><use href="#i-chip"/></svg>')+'<svg class="ic"><use href="#i-chev-d"/></svg>';}
+   el.innerHTML=(b?'<svg class="mlogo" data-b="'+b+'" aria-hidden="true"><use href="#l-'+b+'"/></svg>':'<svg class="ic mfb" aria-hidden="true"><use href="#i-chip"/></svg>')+'<svg class="ic'+(el.classList.contains('cmodel')?' chev':'')+'"><use href="#i-chev-d"/></svg>';}
   else{el.classList.remove('logo-only');el.setAttribute('aria-label','Select model');el.removeAttribute('title');
-   el.innerHTML='<span>Select model</span><svg class="ic"><use href="#i-chev-d"/></svg>';}});
+   el.innerHTML=el.classList.contains('cmodel')?'<svg class="ic mfb" aria-hidden="true"><use href="#i-chip"/></svg><svg class="ic chev" aria-hidden="true"><use href="#i-chev-d"/></svg>':'<span>Select model</span><svg class="ic"><use href="#i-chev-d"/></svg>';}});
 }
 function renderAtts(){const host=$('#chatAtts');
  if(!S.pendingAttachments.length){host.classList.add('hidden');host.innerHTML='';return;}
@@ -2914,7 +2924,7 @@ Code delivery rules:
 - ${LINKS_RULE} If the request is only “Link” and the intended link is unclear from context, ask which link they want instead of generating an unrelated list.${CODE_RULES}`;
 
 async function searchWeb(query,signal){const q=String(query||'').trim();if(!q)return '';const url='https://r.jina.ai/http://www.google.com/search?q='+encodeURIComponent(q);let res;try{res=await fetch(url,{headers:{Accept:'text/plain'},signal});}catch(e){if(e.name==='AbortError')throw e;throw new Error('Web search failed: '+(e.message||'network error'));}if(!res.ok)throw new Error('Web search failed (HTTP '+res.status+').');const raw=(await res.text()).trim();if(!raw)throw new Error('Web search returned no results.');const links=[];const seen=new Set();const re=/\[([^\]]{2,180})\]\((https?:\/\/[^)]+)\)/g;let m;while((m=re.exec(raw))&&links.length<8){const title=m[1].replace(/\s+/g,' ').trim();const link=m[2].trim();if(!seen.has(link)&&!/google\.com\/search/i.test(link)){seen.add(link);links.push({title,link});}}let text=raw.replace(/\\r/g,'').replace(/\\n{3,}/g,'\\n\\n').slice(0,12000);if(links.length)text+='\\n\\n--- Extracted result links ---\\n'+links.map((x,i)=>(i+1)+'. '+x.title+'\\n'+x.link).join('\\n');return 'LIVE WEB SEARCH RESULTS FOR: '+q+'\\nUse these results as external context. Do not claim to have browsed anything beyond the supplied results. Cite source URLs when relevant.\\n\\n'+text;}
-function setWebAccess(on){S.webAccess=!!on;['#chipWeb','#chipWeb2'].forEach(s=>{const b=$(s);if(b){b.classList.toggle('web-on',S.webAccess);b.setAttribute('aria-pressed',S.webAccess?'true':'false');b.title=S.webAccess?'Web access ON':'Web access OFF';}});}
+function setWebAccess(on){S.webAccess=!!on;['#chipWeb','#chipWeb2'].forEach(s=>{const b=$(s);if(b){b.classList.toggle('web-on',S.webAccess);b.setAttribute('aria-pressed',S.webAccess?'true':'false');b.title=S.webAccess?'Web access ON':'Web access OFF';}});const sw=$('#shWeb');if(sw){sw.classList.toggle('on',S.webAccess);sw.setAttribute('aria-checked',S.webAccess?'true':'false');}}
 
 function buildChatMessages(chat){
  const p=activeProvider();
@@ -2968,7 +2978,7 @@ async function sendChat(){if(S.streaming)return;
     const um=S.chat.messages[S.chat.messages.length-2];if(ctx)um.webContext=ctx;
    }
   }
-  await providerChat({provider:activeProvider(),messages:window.withMode(buildChatMessages(S.chat),'chat'),signal:S.abort.signal,reasoning:fastThink(),
+  await providerChat({provider:activeProvider(),messages:buildChatMessages(S.chat),signal:S.abort.signal,reasoning:fastThink(),
   onDelta:d=>{am.content+=d;syncGenFiles(am);updateLive(am,'#msgs');},
   onReasoning:r=>{if(!am.thinkT0)am.thinkT0=Date.now();am.reasoning=(am.reasoning||'')+r;updateLive(am,'#msgs');}});
   await typerDrain(am,'#msgs',S.abort&&S.abort.signal);
@@ -3011,7 +3021,7 @@ $('#agentMsgs').addEventListener('click',threadClick('#agentMsgs'));
 $('#agentMsgs').addEventListener('click',e=>{const qa=e.target.closest('[data-aa]');if(qa){const i=$('#agentInput');i.value=qa.dataset.aa;autoGrow(i);i.focus();}});
 
 /* ---------- attachments ---------- */
-function openSheet(target){S.sheetTarget=target;$('#sheetTitle').textContent=target==='agent'?'Add to agent request':'Add to message';
+function openSheet(target){S.sheetTarget=target;$('#sheetTitle').textContent='Add to chat';
  $('#shPFiles').classList.toggle('hidden',target!=='agent');$('#sheetWrap').classList.add('show');}
 function closeSheet(){$('#sheetWrap').classList.remove('show');}
 $('#sheetWrap').addEventListener('click',e=>{if(e.target.dataset.sheetClose!==undefined)closeSheet();});
@@ -3023,7 +3033,10 @@ $('#shPFiles').onclick=()=>{closeSheet();setTab('code');enterSelection(null);toa
 $('#shPlugins').onclick=()=>{closeSheet();modal(`<h3>Plugins</h3><p class="muted" style="line-height:1.6">No plugins or integrations are connected. Only real, configured integrations would appear here — nothing is simulated.</p><div class="mrow"><button class="btn" id="plC">Close</button></div>`);$('#plC').onclick=closeModal;};
 $('#chipWeb').onclick=()=>{setWebAccess(!S.webAccess);toast(S.webAccess?'Web access ON — live search will be added to the AI context.':'Web access OFF.','info');};
 $('#chipWeb2').onclick=()=>{setWebAccess(!S.webAccess);toast(S.webAccess?'Web access ON — live search will be added to the AI context.':'Web access OFF.','info');};
-$('#filePickPhoto').onchange=e=>{readIn(e.target.files,'chat');e.target.value='';};
+$('#filePickPhoto').onchange=e=>{readIn(e.target.files,S.sheetTarget==='agent'?'agent':'chat');e.target.value='';};
+$('#filePickCamera').onchange=e=>{readIn(e.target.files,S.sheetTarget==='agent'?'agent':'chat');e.target.value='';};
+$('#shCamera').onclick=()=>{closeSheet();$('#filePickCamera').click();};
+$('#shWeb').onclick=()=>{setWebAccess(!S.webAccess);};
 $('#filePickFile').onchange=e=>{readIn(e.target.files,'chat');e.target.value='';};
 $('#filePickAgent').onchange=e=>{readIn(e.target.files,'agent');e.target.value='';};
 const ZIP_ENTRY_MAX=10000000,ZIP_TOTAL_MAX=10000000; /* characters per ZIP text entry / per archive; entries beyond this are reported by name, never skipped silently */
@@ -3041,31 +3054,6 @@ async function readIn(files,target){for(const f of files){
   else{const txt=await f.text();(target==='chat'?S.pendingAttachments:S.agentAttachments).push({kind:'text',name:f.name,size:f.size,content:txt});}
  }catch(err){toast('Could not read '+f.name+': '+err.message,'err');}}
  if(target==='chat')renderAtts();else renderAgentAtts();}
-
-/* ---------- work mode (New button: Auto / Plan / Build) ---------- */
-window.WORK_MODE=window.WORK_MODE||'auto';
-window.WORK_MODES=[{k:'auto',t:'Auto',d:'Works as it does now'},{k:'plan',t:'Plan',d:'Makes a plan first, then builds'},{k:'build',t:'Build',d:'Builds directly, no plan'}];
-window.modeDirective=function(kind){const m=window.WORK_MODE;
- if(m==='plan')return kind==='agent'?'\n\n[Work mode: Plan] Put a short numbered plan (3 to 6 steps) of exactly what you will change in the summary field, then carry out that plan in the files.':'\n\n[Work mode: Plan] First write a short numbered plan of how you will handle this request, then give the full result.';
- if(m==='build')return kind==='agent'?'\n\n[Work mode: Build] Skip any plan or discussion. Implement the request directly in the files, with a one-line summary.':'\n\n[Work mode: Build] Skip any plan or preamble and give the finished result directly.';
- return '';};
-window.withMode=function(msgs,kind){const d=window.modeDirective(kind);if(!d||!Array.isArray(msgs))return msgs;const out=msgs.slice();
- for(let i=out.length-1;i>=0;i--){const x=out[i];if(x&&x.role==='user'){
-  if(typeof x.content==='string')out[i]=Object.assign({},x,{content:x.content+d});
-  else if(Array.isArray(x.content))out[i]=Object.assign({},x,{content:x.content.concat([{type:'text',text:d}])});
-  break;}}
- return out;};
-window.closeWorkModePop=function(){const p=document.getElementById('wmPop');if(p)p.remove();document.removeEventListener('click',wmOutside,true);};
-function wmOutside(e){const p=document.getElementById('wmPop');if(p&&!p.contains(e.target)&&!e.target.closest('.wm-btn'))window.closeWorkModePop();}
-window.openWorkModePop=function(anchor){window.closeWorkModePop();
- const pop=document.createElement('div');pop.id='wmPop';pop.className='wm-pop';pop.setAttribute('role','menu');
- pop.innerHTML=window.WORK_MODES.map(o=>{const on=o.k===window.WORK_MODE;return '<button type="button" class="wm-opt'+(on?' on':'')+'" data-k="'+o.k+'" role="menuitemradio" aria-checked="'+on+'"><span class="wm-tx"><b>'+o.t+'</b><small>'+o.d+'</small></span><span class="wm-ck">'+(on?'\u2713':'')+'</span></button>';}).join('');
- document.body.appendChild(pop);
- const r=anchor.getBoundingClientRect(),w=Math.min(260,window.innerWidth-24);
- pop.style.width=w+'px';pop.style.left=Math.max(12,Math.min(window.innerWidth-w-12,r.left))+'px';pop.style.bottom=(window.innerHeight-r.top+8)+'px';
- pop.querySelectorAll('.wm-opt').forEach(b=>b.onclick=e=>{e.stopPropagation();window.WORK_MODE=b.dataset.k;window.closeWorkModePop();const t=window.WORK_MODES.find(x=>x.k===window.WORK_MODE).t;toast('Mode: '+t,'info');});
- document.addEventListener('click',wmOutside,true);};
-document.querySelectorAll('.wm-btn').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();if(document.getElementById('wmPop'))window.closeWorkModePop();else window.openWorkModePop(b);}));
 
 /* ---------- model selector ---------- */
 const RLV=[{k:'fast',l:'Low'},{k:'balanced',l:'Medium'},{k:'deep',l:'High'},{k:'extra',l:'Extra'},{k:'max',l:'Max'}];
@@ -4665,7 +4653,7 @@ async function retryQueue(mid){if(S.agentStreaming)return;const p=S.project,am=p
  const f=am.queue.find(x=>x.status==='failed');if(f)f.status='retrying';
  try{await runQueue(am);}finally{finishAgent(am);}}
 
-async function sendAgent2(){if(S.agentStreaming)return;const p=S.project;if(!p)return;const inp=$('#agentInput'),text=inp.value.trim(),atts=S.agentAttachments.slice();if(!text&&!atts.length)return;if(!activeProvider()){toast('Set up an AI provider first (Menu > Set Up AI).','warn');renderProviders();openScreen('screen-providers');return;}if(!activeProvider().model){toast('No model selected. Tap the model name at the top to choose one.','warn');openModelSheet();return;}const errAtt=atts.find(a=>a.path==='build-failed.log'),fromBuild=!!(S._fixPending&&errAtt);S._fixPending=false;p.agent.push({id:uid(),role:'user',content:text||'(selected files)',attachments:atts.map(a=>({name:a.path||a.name,size:a.size,kind:a.kind})),createdAt:Date.now(),status:'done'});S.agentAttachments=[];inp.value='';if(agentDraftKey())Cloud.draft.del(agentDraftKey());autoGrow(inp);renderAgentAtts();const am={id:uid(),role:'assistant',content:'',createdAt:Date.now(),status:'streaming',activity:[],queue:[],task:text||'Work with the attached files.',reads:atts.filter(a=>a.kind!=='image').map(a=>a.path||a.name),fromBuild,errText:errAtt?errAtt.content||'':'',extra:atts.filter(a=>a!==errAtt&&typeof a.content==='string').map(a=>({path:a.path||a.name,content:a.content.slice(0,ATT_BUDGET)}))};p.agent.push(am);renderThread('#agentMsgs',p.agent);startReply('#agentMsgs',am.id);S.agentStreaming=true;S.agentAbort=new AbortController();updateSendBtn();try{if(isLinkIntent(text)&&!atts.length){try{await agentLinkReply(am,text);}finally{am._webSearching=false;}return;}const evU=agStart(am,'Understanding the request','search');let webCtx='';if(S.webAccess&&!am.fromBuild&&text&&!atts.length){const hd=p.agent.filter(x=>x!==am&&x.status==='done'&&x.content).slice(0,-1).slice(-4);const dec=await decideSearch(text,hd,S.agentAbort.signal,'The user is talking to a coding agent that builds Android WebView apps and websites inside a project.');if(dec.search&&dec.queries.length)webCtx=await researchWeb(am,dec.queries,S.agentAbort.signal,'#agentMsgs');}let hits=am.errText?filesInText(p,am.errText,true):[];filesInText(p,text,false).forEach(x=>{if(!hits.includes(x))hits.push(x)});const given=new Set(am.extra.map(a=>a.path));hits=hits.filter(x=>!given.has(x)).slice(0,3);let ctx='',used=0;const read=[];for(const x of hits){const f=p.files[x];if(!f||f.binary)continue;const cc=f.content||'';if(used+cc.length>30000)continue;used+=cc.length;read.push(x);ctx+='\n### FILE: '+x+'\n'+cc+'\n### END FILE\n'}agAct(am,read.length?'Read '+read.join(', ')+' (targeted)':'Planning from project file list',read.length?'file':'info');let up='TASK:\n'+am.task+window.modeDirective('agent');if(am.errText)up+='\n\nREAL FAILURE LOG:\n'+errSummary(am.errText);am.extra.forEach(a=>{up+='\n\nATTACHED FILE '+a.path+':\n'+a.content});if(webCtx)up+='\n\nLIVE WEB CONTEXT (fresh research done for this request; use the concrete details in it):\n'+webCtx.slice(0,9000);up+='\n\nPROJECT FILE LIST:\n'+Object.keys(p.files).sort().slice(0,400).join('\n')+'\n\nFILES ALREADY READ:'+(ctx||' none')+'\n\nRECENT PROJECT CHANGES (earlier in this chat): '+(recentChanges(p,am).join(', ')||'none')+'\n\nCONVERSATION RULES: First decide the intent of the LATEST user message, using earlier messages for context (a follow-up such as "make it black" refers to the work already discussed). Intents: greeting, chat, question, project_question, explain, inspect, code_change, bug_fix, build_fix, clarify. For greeting/chat/question/project_question/explain/inspect/clarify, answer naturally in the language the user writes in, put the reply in "answer", keep files [], and NEVER mention build errors, infrastructure or file changes. Use clarify only if a code request is truly ambiguous. For clarify set "questions" to {"groups":[{"q":"question text","options":["choice 1","choice 2"]}],"button":"short action label"} written from the real context in the language of the user (1 to 4 groups, 2 to 6 options each, no numbering); otherwise questions is null. Set "infrastructure" true ONLY when a REAL FAILURE LOG is attached above and shows no project-code error; otherwise it is always false.\n\nReturn ONLY one JSON object: {"intent":"","analysis":{"root_cause":"","failed_task":"","failed_step":"","error_type":"","error_file":"","error_line":null,"relevant_dependency":null,"recommended_fix":""},"infrastructure":false,"summary":"one short line","answer":"reply text when no file change is needed, else empty","questions":null,"files":[{"path":"relative/path","action":"modify|create|delete","reason":"short","refs":[]}]}. For a code change or bug fix list only the files that must change (minimal set)."';const hist=p.agent.filter(m=>m!==am&&m.status==='done'&&m.content).slice(0,-1).slice(-6).map(m=>({role:m.role,content:m.content}));let raw='';const tP=Date.now();await providerChat({provider:activeProvider(),messages:[{role:'system',content:AG_SYS},...hist,{role:'user',content:up}],signal:S.agentAbort.signal,reasoning:'fast',onDelta:d=>{raw+=d;const pa=partialAnswer(raw);if(pa&&pa!==am.content){am.content=pa;updateLive(am,'#agentMsgs');}},onReasoning:think(am)});let plan;try{plan=JSON.parse((raw.match(/\{[\s\S]*\}/)||[''])[0])}catch(_){plan=null}if(!plan||typeof plan!=='object'){if(!am.fromBuild&&!am.errText&&raw.trim())plan={intent:'chat',answer:raw.trim(),files:[]};else throw new Error('The model did not return a valid plan. Try again.');}const seen=new Set();am.queue=(plan.files||[]).map(f=>({path:normPath(f&&f.path),action:String(f&&f.action||'modify').toLowerCase(),reason:String(f&&f.reason||''),refs:((f&&f.refs)||[]).map(normPath).filter(r=>p.files[r]).slice(0,2)})).filter(f=>f.path&&!isUnsafe(f.path)&&!seen.has(f.path)&&seen.add(f.path)).slice(0,12).map(f=>{if(f.action!=='delete')f.action=p.files[f.path]?'modify':'create';f.status='queued';return f});am.plan=String(plan.summary||'');const an=plan.analysis||{};if(an.root_cause&&(am.fromBuild||am.errText))agAct(am,'Root cause: '+String(an.root_cause).slice(0,300)+(an.error_file?' ('+an.error_file+(an.error_line?':'+an.error_line:'')+')':''),'search');const intent=String(plan.intent||'').toLowerCase().replace(/[^a-z_]/g,''),talk=/^(greeting|chat|question|project_question|explain|inspect|clarify|identity)$/.test(intent);if(talk)am.queue=[];
+async function sendAgent2(){if(S.agentStreaming)return;const p=S.project;if(!p)return;const inp=$('#agentInput'),text=inp.value.trim(),atts=S.agentAttachments.slice();if(!text&&!atts.length)return;if(!activeProvider()){toast('Set up an AI provider first (Menu > Set Up AI).','warn');renderProviders();openScreen('screen-providers');return;}if(!activeProvider().model){toast('No model selected. Tap the model name at the top to choose one.','warn');openModelSheet();return;}const errAtt=atts.find(a=>a.path==='build-failed.log'),fromBuild=!!(S._fixPending&&errAtt);S._fixPending=false;p.agent.push({id:uid(),role:'user',content:text||'(selected files)',attachments:atts.map(a=>({name:a.path||a.name,size:a.size,kind:a.kind})),createdAt:Date.now(),status:'done'});S.agentAttachments=[];inp.value='';if(agentDraftKey())Cloud.draft.del(agentDraftKey());autoGrow(inp);renderAgentAtts();const am={id:uid(),role:'assistant',content:'',createdAt:Date.now(),status:'streaming',activity:[],queue:[],task:text||'Work with the attached files.',reads:atts.filter(a=>a.kind!=='image').map(a=>a.path||a.name),fromBuild,errText:errAtt?errAtt.content||'':'',extra:atts.filter(a=>a!==errAtt&&typeof a.content==='string').map(a=>({path:a.path||a.name,content:a.content.slice(0,ATT_BUDGET)}))};p.agent.push(am);renderThread('#agentMsgs',p.agent);startReply('#agentMsgs',am.id);S.agentStreaming=true;S.agentAbort=new AbortController();updateSendBtn();try{if(isLinkIntent(text)&&!atts.length){try{await agentLinkReply(am,text);}finally{am._webSearching=false;}return;}const evU=agStart(am,'Understanding the request','search');let webCtx='';if(S.webAccess&&!am.fromBuild&&text&&!atts.length){const hd=p.agent.filter(x=>x!==am&&x.status==='done'&&x.content).slice(0,-1).slice(-4);const dec=await decideSearch(text,hd,S.agentAbort.signal,'The user is talking to a coding agent that builds Android WebView apps and websites inside a project.');if(dec.search&&dec.queries.length)webCtx=await researchWeb(am,dec.queries,S.agentAbort.signal,'#agentMsgs');}let hits=am.errText?filesInText(p,am.errText,true):[];filesInText(p,text,false).forEach(x=>{if(!hits.includes(x))hits.push(x)});const given=new Set(am.extra.map(a=>a.path));hits=hits.filter(x=>!given.has(x)).slice(0,3);let ctx='',used=0;const read=[];for(const x of hits){const f=p.files[x];if(!f||f.binary)continue;const cc=f.content||'';if(used+cc.length>30000)continue;used+=cc.length;read.push(x);ctx+='\n### FILE: '+x+'\n'+cc+'\n### END FILE\n'}agAct(am,read.length?'Read '+read.join(', ')+' (targeted)':'Planning from project file list',read.length?'file':'info');let up='TASK:\n'+am.task;if(am.errText)up+='\n\nREAL FAILURE LOG:\n'+errSummary(am.errText);am.extra.forEach(a=>{up+='\n\nATTACHED FILE '+a.path+':\n'+a.content});if(webCtx)up+='\n\nLIVE WEB CONTEXT (fresh research done for this request; use the concrete details in it):\n'+webCtx.slice(0,9000);up+='\n\nPROJECT FILE LIST:\n'+Object.keys(p.files).sort().slice(0,400).join('\n')+'\n\nFILES ALREADY READ:'+(ctx||' none')+'\n\nRECENT PROJECT CHANGES (earlier in this chat): '+(recentChanges(p,am).join(', ')||'none')+'\n\nCONVERSATION RULES: First decide the intent of the LATEST user message, using earlier messages for context (a follow-up such as "make it black" refers to the work already discussed). Intents: greeting, chat, question, project_question, explain, inspect, code_change, bug_fix, build_fix, clarify. For greeting/chat/question/project_question/explain/inspect/clarify, answer naturally in the language the user writes in, put the reply in "answer", keep files [], and NEVER mention build errors, infrastructure or file changes. Use clarify only if a code request is truly ambiguous. For clarify set "questions" to {"groups":[{"q":"question text","options":["choice 1","choice 2"]}],"button":"short action label"} written from the real context in the language of the user (1 to 4 groups, 2 to 6 options each, no numbering); otherwise questions is null. Set "infrastructure" true ONLY when a REAL FAILURE LOG is attached above and shows no project-code error; otherwise it is always false.\n\nReturn ONLY one JSON object: {"intent":"","analysis":{"root_cause":"","failed_task":"","failed_step":"","error_type":"","error_file":"","error_line":null,"relevant_dependency":null,"recommended_fix":""},"infrastructure":false,"summary":"one short line","answer":"reply text when no file change is needed, else empty","questions":null,"files":[{"path":"relative/path","action":"modify|create|delete","reason":"short","refs":[]}]}. For a code change or bug fix list only the files that must change (minimal set)."';const hist=p.agent.filter(m=>m!==am&&m.status==='done'&&m.content).slice(0,-1).slice(-6).map(m=>({role:m.role,content:m.content}));let raw='';const tP=Date.now();await providerChat({provider:activeProvider(),messages:[{role:'system',content:AG_SYS},...hist,{role:'user',content:up}],signal:S.agentAbort.signal,reasoning:'fast',onDelta:d=>{raw+=d;const pa=partialAnswer(raw);if(pa&&pa!==am.content){am.content=pa;updateLive(am,'#agentMsgs');}},onReasoning:think(am)});let plan;try{plan=JSON.parse((raw.match(/\{[\s\S]*\}/)||[''])[0])}catch(_){plan=null}if(!plan||typeof plan!=='object'){if(!am.fromBuild&&!am.errText&&raw.trim())plan={intent:'chat',answer:raw.trim(),files:[]};else throw new Error('The model did not return a valid plan. Try again.');}const seen=new Set();am.queue=(plan.files||[]).map(f=>({path:normPath(f&&f.path),action:String(f&&f.action||'modify').toLowerCase(),reason:String(f&&f.reason||''),refs:((f&&f.refs)||[]).map(normPath).filter(r=>p.files[r]).slice(0,2)})).filter(f=>f.path&&!isUnsafe(f.path)&&!seen.has(f.path)&&seen.add(f.path)).slice(0,12).map(f=>{if(f.action!=='delete')f.action=p.files[f.path]?'modify':'create';f.status='queued';return f});am.plan=String(plan.summary||'');const an=plan.analysis||{};if(an.root_cause&&(am.fromBuild||am.errText))agAct(am,'Root cause: '+String(an.root_cause).slice(0,300)+(an.error_file?' ('+an.error_file+(an.error_line?':'+an.error_line:'')+')':''),'search');const intent=String(plan.intent||'').toLowerCase().replace(/[^a-z_]/g,''),talk=/^(greeting|chat|question|project_question|explain|inspect|clarify|identity)$/.test(intent);if(talk)am.queue=[];
 if(am.fromBuild&&plan.infrastructure===true&&!am.queue.length){am.content='No project-code error was found in the build log. The failure appears to be infrastructure/build-service related.'+(an.root_cause?'\n\n'+an.root_cause:'')+'\nNo project files were changed.';agEnd(am,evU,'done','Build log analysed \u2014 no project-code error found');am.status='done';return;}
 agEnd(am,evU,'done',intent?'Request understood ('+intent.replace(/_/g,' ')+')':'Request understood',{detail:'Planner responded in '+((Date.now()-tP)/1000).toFixed(1)+'s'});
 if(!am.queue.length){let ans=String(plan.answer||'').trim();if(!ans&&!am.fromBuild&&!(plan.questions&&plan.questions.groups))ans=await agentChatReply(am,hist,text);if(!ans)ans=am.plan||'I could not find a change to make. Could you describe what you want changed?';am.content=ans+qBlock(plan.questions);agAct(am,am.fromBuild?'No file changes were needed':'Replied \u2014 no file operations were needed','info');await typerDrain(am,'#agentMsgs',S.agentAbort.signal);am.status='done';return;}
@@ -5749,7 +5737,11 @@ function systemPrompt(mode,p){
   '- export(mode, path): the app shows the user download buttons. Call it once, at the end, after verification.\n'+
   '- Plain conversation (greetings, questions, explanations) needs no tools: just answer directly.\n';
  if(mode==='project')s+='- The workspace is the Code tab of the project "'+p.name+'" ('+(TECHS[p.tech]?TECHS[p.tech].title:'imported project')+', package '+(p.package||'n/a')+'). Edits are saved to the project immediately and the user can revert a whole run. Paths are relative to the project root. Do not touch build output, lockfiles or dependency folders.\n';
- return s+'\n'+THINK_RULE+'\n'+PROMPT_RULE+'\n'+LINKS_RULE;}
+ return s+'\n'+THINK_RULE+'\n'+PROMPT_RULE+'\n'+LINKS_RULE+modeRule();}
+function modeRule(){const m=S.agentMode;
+ if(m==='plan')return '\n\n## MODE: PLAN (chosen by the user in the composer)\nWhen the user asks you to create, build, change, fix or delete something, you must write a plan BEFORE you touch anything. Write it as plain text at the start of your reply, under a first line that says only: Plan. Then 3 to 7 short numbered steps: what you will do, and which files you will create or change. Right after the plan, in that same reply, send your first TOOL_CALL and then carry out the whole plan step by step. Do NOT stop after the plan and do NOT ask the user to approve it. Write the plan once only; do not repeat it later. In your final report, say briefly which plan steps are done. For greetings, questions and explanations that change nothing, just answer normally with no plan.';
+ if(m==='build')return '\n\n## MODE: BUILD (chosen by the user in the composer)\nWhen the user asks you to create, build, change, fix or delete something, build it directly. Do not write a plan, an outline or an introduction first, and do not ask questions unless the request is impossible to carry out without the answer (then make the most reasonable assumption and say so in one line at the end). Your first reply should already be a TOOL_CALL. Keep your final report short. For greetings, questions and explanations that change nothing, just answer normally.';
+ return '';}
 function pushHist(out,role,text,parts){
  if(!out.length&&role!=='user')return;const last=out[out.length-1];
  if(last&&last.role===role&&!last.parts&&!parts)last.text+='\n\n'+text;else out.push({role,kind:'hist',text,parts});}
@@ -5962,31 +5954,111 @@ window.__codingAgent={execTool,parseCall,visible,build,changedList,snapBase,chkJ
 .mtop-pj.logo-only .mlogo{width:22px;height:22px}
 .mtop-pj.logo-only .ic.mfb{width:22px;height:22px}
 </style>
-
-<style id="wm-ui">
-/* New (work mode) button next to Web access */
-.wm-btn{height:36px;padding:0 8px 0 10px;border-radius:12px;display:inline-flex;align-items:center;gap:3px;font-size:12.5px;font-weight:600;color:#94A3B8;background:rgba(255,255,255,0.03);flex:none;white-space:nowrap;transition:background .12s,color .12s}
-.wm-btn:hover{background:rgba(255,255,255,0.08);color:#fff}
-.wm-btn:active{transform:scale(.96)}
-.wm-btn .ic{width:13px;height:13px}
-/* brain icon only (reasoning effort) */
-.cbtn.brain-btn span{display:none}
-.cbtn.dis{opacity:.45}
-/* model select inside composer (Project Agent tab) */
-.pjmodel{height:36px;max-width:112px;min-width:0;padding:0 8px;border-radius:12px;display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;color:#94A3B8;background:rgba(255,255,255,0.03);flex:0 1 auto;overflow:hidden}
-.pjmodel span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pjmodel .ic{width:13px;height:13px;flex:none}
-.pjmodel .mlogo{width:18px;height:18px;flex:none}
-.pjmodel:hover{background:rgba(255,255,255,0.08);color:#fff}
-/* popup */
-.wm-pop{position:fixed;z-index:200;background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow);padding:6px;display:flex;flex-direction:column;gap:2px}
-.wm-opt{display:flex;align-items:center;gap:8px;padding:10px;border-radius:12px;text-align:left;width:100%}
-.wm-opt:hover{background:rgba(255,255,255,0.06)}
-.wm-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
-.wm-tx b{font-size:14.5px;font-weight:600;color:var(--text)}
-.wm-tx small{font-size:12px;color:var(--text2)}
-.wm-opt.on .wm-tx b{color:var(--accent)}
-.wm-ck{width:18px;text-align:center;color:var(--accent);font-weight:700}
+<style id="flay-composer-v3">
+/* ===== Composer v3: black box, white border, round buttons, white send ===== */
+:root:root .composer{padding:6px 8px calc(8px + env(safe-area-inset-bottom))}
+:root:root .composer .cbox2{background:#000;border:2px solid #fff;border-radius:30px;padding:14px 12px 10px;gap:6px;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none}
+:root:root .composer .cbox2:focus-within{border-color:#fff;box-shadow:none}
+:root:root .composer .c-input-row{padding:0 4px}
+:root:root .composer .cbox2 textarea{font-size:16px;color:#fff;caret-color:#fff;padding:4px 2px}
+:root:root .composer .cbox2 textarea::placeholder{color:#6f6f73}
+:root:root .composer .crow{gap:6px;margin-top:6px;flex-wrap:nowrap}
+:root:root .composer .cbtn{width:40px;height:40px;border-radius:50%;background:#161616;color:#fff}
+:root:root .composer .cbtn:active{background:#262626}
+:root:root .composer .cbtn.web-on{background:rgba(0,210,255,.16);color:#00D2FF}
+:root:root .composer .cbtn.send{width:46px;height:46px;background:#fff;color:#000;box-shadow:none}
+:root:root .composer .cbtn.send .ic{width:21px;height:21px}
+:root:root .composer .cbtn.send:active{transform:scale(.92)}
+:root:root .composer .cbtn.send:disabled{opacity:.4}
+:root:root .composer .cmode,:root:root .composer .mchip,:root:root .composer .cmodel{display:inline-flex;align-items:center;justify-content:center;gap:6px;flex:none;height:40px;padding:0 12px;border-radius:999px;border:1px solid #2b2b2e;background:#000;color:#fff;font-size:14px;font-weight:600;max-width:none;overflow:hidden;white-space:nowrap}
+:root:root .composer .cmode:active,:root:root .composer .mchip:active,:root:root .composer .cmodel:active{background:#161616}
+:root:root .composer .cmode[aria-expanded=true]{background:#161616;border-color:#4a4a50}
+:root:root .composer .cmode .ic{width:17px;height:17px;color:#FFB020}
+:root:root .composer .mchip .ic{width:18px;height:18px;display:block}
+:root:root .composer .mchip.dis{opacity:.5}
+:root:root .composer .cmodel{padding:0 10px;gap:4px;min-width:0}
+:root:root .composer .cmodel .mlogo{width:22px;height:22px}
+:root:root .composer .cmodel .ic.mfb{width:20px;height:20px;color:#fff}
+:root:root .composer .cmodel .ic.chev{width:14px;height:14px;color:#8d8d93}
+:root:root .composer .cgrow{flex:1;min-width:0}
+/* narrow screens: keep everything on one row */
+@media (max-width:379px){:root:root .composer .mchip span{display:none}:root:root .composer .mchip{padding:0 11px}}
+@media (max-width:429px){:root:root #pjAgent .composer .mchip span{display:none}:root:root #pjAgent .composer .mchip{padding:0 11px}:root:root #pjAgent .composer .cmodel .ic.chev{display:none}:root:root #pjAgent .composer .cbtn{width:38px;height:38px}:root:root #pjAgent .composer .cmode,:root:root #pjAgent .composer .mchip,:root:root #pjAgent .composer .cmodel{height:38px}:root:root #pjAgent .composer .cmode{padding:0 10px;gap:5px}:root:root #pjAgent .composer .cbtn.send{width:42px;height:42px}}
+/* Project Workspace > Agent tab: no top model bar any more */
+#screen-project #pjAgent>.scrollpane{padding-top:86px!important}
+/* ===== Add to chat sheet ===== */
+:root:root .sheet.atc-sheet{background:#000;border-top:0;border-radius:28px 28px 0 0;padding:10px 14px calc(18px + env(safe-area-inset-bottom));gap:0}
+.atc-grip{width:44px;height:5px;border-radius:3px;background:#2b2b2f;margin:0 auto 12px}
+.atc-head{display:flex;align-items:center;justify-content:space-between;margin:0 0 16px}
+.atc-x{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;flex:none}
+.atc-x .ic{width:26px;height:26px;stroke-width:2.2}
+.atc-x-sp{width:44px;flex:none}
+.atc-title{flex:1;text-align:center;font-size:20px;font-weight:700;color:#fff;letter-spacing:-.01em}
+.atc-tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
+.atc-tile{display:flex;flex-direction:column;align-items:center;gap:12px;padding:20px 6px 16px;border-radius:26px;background:#0c0c0e;color:#fff}
+.atc-tile:active,.atc-row:active{background:#18181b}
+.atc-tile b{font-size:16px;font-weight:600}
+.atc-ico{width:54px;height:54px;border-radius:50%;background:#1c1c1f;display:flex;align-items:center;justify-content:center;flex:none;color:#fff}
+.atc-ico .ic{width:25px;height:25px}
+.atc-row{display:flex;align-items:center;gap:16px;width:100%;padding:10px 16px 10px 12px;border-radius:26px;background:#0c0c0e;color:#fff;margin-bottom:8px;text-align:left}
+.atc-row.hidden{display:none}
+.atc-row b{flex:1;min-width:0;font-size:18px;font-weight:600}
+.atc-go{display:flex;color:#8e8e93;flex:none}
+.atc-go .ic{width:22px;height:22px}
+.atc-sw{width:56px;height:34px;border-radius:17px;background:#3a3a3c;position:relative;flex:none;transition:background .18s}
+.atc-sw i{position:absolute;top:3px;left:3px;width:28px;height:28px;border-radius:50%;background:#fff;transition:transform .18s}
+.atc-row.on .atc-sw{background:#0A6CFF}
+.atc-row.on .atc-sw i{transform:translateX(22px)}
+/* ===== Mode dropdown (Auto / Plan / Build) ===== */
+.mode-menu{position:fixed;z-index:300;background:#0b0b0e;border:1px solid rgba(255,255,255,.14);border-radius:22px;padding:6px;box-shadow:0 18px 50px rgba(0,0,0,.85);opacity:0;transform:translateY(8px) scale(.97);transform-origin:bottom left;transition:opacity .16s,transform .16s}
+.mode-menu.in{opacity:1;transform:none}
+.mm-it{display:flex;align-items:center;gap:12px;width:100%;padding:10px 12px;border-radius:16px;color:#fff;text-align:left}
+.mm-it:active,.mm-it.on{background:rgba(255,255,255,.07)}
+.mm-ico{width:36px;height:36px;border-radius:50%;background:#1c1c1f;display:flex;align-items:center;justify-content:center;flex:none}
+.mm-ico .ic{width:18px;height:18px}
+.mm-tx{display:flex;flex-direction:column;min-width:0;flex:1}
+.mm-tx b{font-size:15.5px;font-weight:700}
+.mm-tx i{font-style:normal;font-size:12.5px;color:#8e8e98;margin-top:1px}
+.mm-ck{width:18px;height:18px;color:#fff;opacity:0;flex:none}
+.mm-it.on .mm-ck{opacity:1}
 </style>
+<script id="flay-composer-v3-js">
+(function(){'use strict';
+const MODES=[
+ {k:'auto',t:'Auto',d:'Works as usual',ic:'i-spark'},
+ {k:'plan',t:'Plan',d:'Makes a plan first, then builds',ic:'i-plan'},
+ {k:'build',t:'Build',d:'Builds directly, no plan',ic:'i-hammer'}];
+const get=k=>MODES.find(m=>m.k===k)||MODES[0];
+let menu=null,openFor=null;
+function paint(){const m=get(S.agentMode);
+ ['chipMode','chipMode2'].forEach(id=>{const b=document.getElementById(id);if(!b)return;
+  const sp=b.querySelector('span');if(sp)sp.textContent=m.t;b.setAttribute('aria-label','Mode: '+m.t);});}
+function close(){if(!menu)return;menu.remove();menu=null;
+ if(openFor){openFor.setAttribute('aria-expanded','false');openFor=null;}
+ document.removeEventListener('pointerdown',outside,true);document.removeEventListener('keydown',esc,true);window.removeEventListener('resize',close);}
+function outside(e){if(menu&&!menu.contains(e.target)&&!(openFor&&openFor.contains(e.target)))close();}
+function esc(e){if(e.key==='Escape')close();}
+function setMode(k){S.agentMode=get(k).k;paint();try{saveSettings();}catch(_){}}
+function open(btn){
+ if(menu&&openFor===btn){close();return;}
+ close();
+ menu=document.createElement('div');menu.className='mode-menu';menu.setAttribute('role','menu');
+ menu.innerHTML=MODES.map(m=>'<button type="button" class="mm-it'+(m.k===S.agentMode?' on':'')+'" role="menuitemradio" aria-checked="'+(m.k===S.agentMode)+'" data-mode="'+m.k+'"><span class="mm-ico"><svg class="ic"><use href="#'+m.ic+'"/></svg></span><span class="mm-tx"><b>'+m.t+'</b><i>'+m.d+'</i></span><svg class="ic mm-ck"><use href="#i-check"/></svg></button>').join('');
+ document.body.appendChild(menu);
+ const r=btn.getBoundingClientRect(),w=Math.min(264,window.innerWidth-16);
+ menu.style.width=w+'px';
+ menu.style.left=Math.max(8,Math.min(window.innerWidth-w-8,r.left))+'px';
+ menu.style.bottom=(window.innerHeight-r.top+8)+'px';
+ btn.setAttribute('aria-expanded','true');openFor=btn;
+ requestAnimationFrame(()=>{if(menu)menu.classList.add('in');});
+ menu.addEventListener('click',e=>{const it=e.target.closest('[data-mode]');if(!it)return;setMode(it.dataset.mode);close();});
+ document.addEventListener('pointerdown',outside,true);document.addEventListener('keydown',esc,true);window.addEventListener('resize',close);}
+['chipMode','chipMode2'].forEach(id=>{const b=document.getElementById(id);if(b)b.addEventListener('click',()=>open(b));});
+/* re-apply the saved mode after settings load (updateChips runs then) */
+const _uc=window.updateChips;
+if(typeof _uc==='function')window.updateChips=function(){const r=_uc.apply(this,arguments);try{paint();}catch(_){}return r;};
+paint();
+})();
+</script>
 </body>
 </html>
