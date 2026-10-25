@@ -2079,13 +2079,13 @@ async function providerChat(o){const p=o.provider;if(!p)throw new Error('No AI p
  if(!res.ok){clearTimeout(hdr);let t='';try{t=await res.text()}catch(_){}throw new Error(describeHttp(res.status,t));}
  if(!body.stream||!res.body){let j;try{j=await res.json();}catch(e){clearTimeout(hdr);if(timedOut)throw tmo();throw e;}clearTimeout(hdr);const m=(j.choices&&j.choices[0]&&j.choices[0].message)||{};const c=m.content||'';
   if(o.onDelta&&c)o.onDelta(c);if(o.onReasoning&&(m.reasoning_content||m.reasoning))o.onReasoning(m.reasoning_content||m.reasoning);return c;}
- const reader=res.body.getReader(),dec=new TextDecoder();let buf='';const IDLE=o.idleMs||25000,FIRST=o.firstMs||90000;let started=false,thinkT=0,gotC=false;
- const rsel=o.reasoning||S.settings.reasoning,BUD=o.thinkMs||({off:12000,fast:20000,balanced:20000,deep:45000,extra:90000,max:150000}[rsel]||20000);
- const rd=()=>{const lim=started?IDLE:FIRST;return new Promise((ok,no)=>{const t=setTimeout(()=>{try{reader.cancel();}catch(_){}no(new Error('Network error: the provider stopped responding for '+Math.round(lim/1000)+'s'));},lim);reader.read().then(v=>{clearTimeout(t);ok(v);},e=>{clearTimeout(t);no(e);});});};
+ const reader=res.body.getReader(),dec=new TextDecoder();let buf='';const IDLE=o.idleMs||12000,IDLEC=25000,FIRST=o.firstMs||40000;let started=false,thinkT=0,gotC=false,prog=false,lastProg=Date.now();
+ const rsel=o.reasoning||S.settings.reasoning,BUD=o.thinkMs||({off:8000,fast:12000,balanced:12000,deep:45000,extra:90000,max:150000}[rsel]||12000);
+ const rd=()=>{const lim=gotC?IDLEC:(prog?IDLE:FIRST),left=Math.max(400,lim-(Date.now()-lastProg));return new Promise((ok,no)=>{const t=setTimeout(()=>{try{reader.cancel();}catch(_){}no(new Error('Network error: the provider stopped responding for '+Math.round(lim/1000)+'s'));},left);reader.read().then(v=>{clearTimeout(t);ok(v);},e=>{clearTimeout(t);no(e);});});};
  const one=line=>{line=line.trim();if(!line.startsWith('data:'))return false;const data=line.slice(5).trim();if(data==='[DONE]')return true;
   let j;try{j=JSON.parse(data)}catch(_){return false}
   const d=(j.choices&&j.choices[0]&&j.choices[0].delta)||{};const r=d.reasoning_content||d.reasoning||'';const c=d.content||'';
-  if(r){if(!thinkT)thinkT=Date.now();if(o.onReasoning)o.onReasoning(r);}if(c){gotC=true;if(o.onDelta)o.onDelta(c);}return false;};
+  if(r){prog=true;lastProg=Date.now();if(!thinkT)thinkT=Date.now();if(o.onReasoning)o.onReasoning(r);}if(c){prog=true;lastProg=Date.now();gotC=true;if(o.onDelta)o.onDelta(c);}return false;};
  while(true){const{done,value}=await rd();if(done)break;started=true;buf+=dec.decode(value,{stream:true});
   let i;while((i=buf.indexOf('\n'))>=0){const line=buf.slice(0,i);buf=buf.slice(i+1);if(one(line))return '';}
   if(o.thinkBudget&&thinkT&&!gotC&&Date.now()-thinkT>BUD){try{reader.cancel();}catch(_){}const e=new Error('The model kept thinking for too long.');e.thinkBudget=true;throw e;}}
@@ -2131,7 +2131,7 @@ function statusIcon(st){if(st==='done')return icon('check','sm st-done');if(st==
 /* ---------- AI thinking: compact row + bottom "Steps" sheet (real model reasoning only) ---------- */
 const _tkCache=new WeakMap();
 const _tk={mid:null};
-const TK_DWELL=700;
+const TK_DWELL=0;
 const TK_ORB=(()=>{const cols=['#D45BFF','#C455FF','#A860FF','#8C62FF','#7360FF','#6A5CFF','#8F5BF2','#BC52F7'];let o='<svg class="tk-orb" viewBox="0 0 32 32" aria-hidden="true">';for(let i=0;i<8;i++)o+='<ellipse cx="16" cy="6" rx="2.3" ry="3.6" class="tk-p" style="animation-delay:-'+(i*0.15).toFixed(2)+'s" fill="'+cols[i]+'" transform="rotate('+(i*45)+' 16 16)"/>';return o+'</svg>';})();
 
 /* Split the model's real reasoning text into steps. Nothing is invented. */
@@ -2145,7 +2145,7 @@ function thinkStepsRaw(m){
  const streaming=m.status==='streaming';
  /* a half-written heading line is ignored until it is complete, so titles never flicker */
  if(streaming&&r&&!/\n$/.test(r)){const i=r.lastIndexOf('\n'),tail=r.slice(i+1).trim();if(/^(\*\*|#)/.test(tail))r=r.slice(0,i+1);}
- const key=r.length+(streaming?'s':'d');
+ const key=r.length+'|'+r.slice(-40)+(streaming?'s':'d');
  const c=_tkCache.get(m);if(c&&c.k===key)return c.s;
  const steps=[];let cur=null,gap=false;
  r.split('\n').forEach(line=>{
@@ -2183,6 +2183,7 @@ function tkBrief(st){
  return mm?mm[1]:'';
 }
 /* Full text of the current step, shown in a smooth ticker window beside the spinner. */
+function tkTail(m){const t=String(m.reasoning||'').replace(/\s+/g,' ').trim();return t.length>240?t.slice(-240):t;}
 function tkFull(st){return st&&st.text?st.text.replace(/\s+/g,' ').trim():'';}
 /* What the inline row shows: only the current key step. Null when there is nothing real to show. */
 function thinkView(m){
@@ -2195,7 +2196,7 @@ function thinkView(m){
  const key=steps.filter(x=>!x.part&&x.title.length>=6);
  const last=key[key.length-1];
  if(last)return{live:true,can:true,title:last.title,desc:tkFull(last)};
- return{live:true,can:steps.length>0,title:'Thinking\u2026',desc:''};
+ return{live:true,can:steps.length>0,title:'Thinking\u2026',desc:tkTail(m)};
 }
 function thinkRowHtml(v,enter){
  return '<div class="tk'+(v.live?' live':'')+(v.can?' can':'')+(enter?' enter':'')+'"'+(v.can?' data-think="1"':'')+' aria-live="polite"><div class="tk-rail">'+TK_ORB+'<span class="tk-line"></span></div><div class="tk-txt"><div class="tk-t">'+esc(v.title)+'</div><div class="tk-dw'+(v.desc?' on':'')+'"><div class="tk-d">'+esc(v.desc)+'</div></div></div></div>';
@@ -2627,9 +2628,9 @@ function updateChips(){const p=activeProvider();
  ['#chipModel','#chipModel2'].forEach(s=>{const el=$(s);if(el){el.querySelector('span').textContent=rl;el.classList.toggle('dis',!(p&&p.supportsReasoning));}});
  const nm=(p&&p.model)?p.model:'';
  ['#topModel','#topModel2'].forEach(s=>{const el=$(s);if(!el)return;
-  if(nm){const b=mpBrand(nm)||mpBrand(p&&p.name)||'';
+  if(nm){const b=mpBrand(nm)||mpBrand(p&&p.name)||'',dom=mpHost(p&&p.baseUrl);
    el.classList.add('logo-only');el.setAttribute('aria-label','Model: '+nm);el.title=nm;
-   el.innerHTML=(b?'<svg class="mlogo" data-b="'+b+'" aria-hidden="true"><use href="#l-'+b+'"/></svg>':'<svg class="ic mfb" aria-hidden="true"><use href="#i-chip"/></svg>')+'<svg class="ic'+(el.classList.contains('cmodel')?' chev':'')+'"><use href="#i-chev-d"/></svg>';}
+   el.innerHTML=mpLogoHtml(b,dom)+'<svg class="ic'+(el.classList.contains('cmodel')?' chev':'')+'"><use href="#i-chev-d"/></svg>';}
   else{el.classList.remove('logo-only');el.setAttribute('aria-label','Select model');el.removeAttribute('title');
    el.innerHTML=el.classList.contains('cmodel')?'<svg class="ic mfb" aria-hidden="true"><use href="#i-chip"/></svg><svg class="ic chev" aria-hidden="true"><use href="#i-chev-d"/></svg>':'<span>Select model</span><svg class="ic"><use href="#i-chev-d"/></svg>';}});
 }
@@ -3162,13 +3163,28 @@ function mpBrand(s){s=String(s||'').toLowerCase();
  if(/claude|anthropic/.test(s))return'claude';if(/gpt|openai|chatgpt|\bo[134](-|\b)/.test(s))return'openai';
  if(/gemini|gemma|google/.test(s))return'gemini';if(/deepseek/.test(s))return'deepseek';
  if(/llama|meta|muse/.test(s))return'meta';if(/glm|z\.ai|zhipu/.test(s))return'zai';if(/grok|xai/.test(s))return'grok';return null;}
+/* official company logos: each model shows its own company's site icon; the old inline mark is the offline fallback */
+function mpDom(b){return({claude:'claude.ai',openai:'openai.com',gemini:'gemini.google.com',deepseek:'deepseek.com',meta:'meta.ai',zai:'z.ai',grok:'x.ai'})[b]||'';}
+function mpHost(u){try{u=String(u||'').trim();if(!u)return '';const h=new URL(/^[a-z]+:\/\//i.test(u)?u:'https://'+u).hostname.toLowerCase();
+ if(h.indexOf('.')<0||/^\d+\.\d+\.\d+\.\d+$/.test(h)||/^\[/.test(h))return '';
+ const q=h.split('.');let n=2;if(q.length>2&&/^(co|com|org|net|gov|ac|edu)$/.test(q[q.length-2])&&q[q.length-1].length===2)n=3;return q.slice(-n).join('.');}catch(_){return '';}}
+function mpLogoSrc(d,alt){return alt?'https://icons.duckduckgo.com/ip3/'+encodeURIComponent(d)+'.ico':'https://www.google.com/s2/favicons?domain='+encodeURIComponent(d)+'&sz=128';}
+window.mpImgErr=function(img){try{const d=img.dataset.d;if(d&&img.dataset.s!=='1'){img.dataset.s='1';img.src=mpLogoSrc(d,true);return;}
+ const b=img.dataset.b,w=document.createElement('span');
+ w.innerHTML=b?'<svg class="mlogo" data-b="'+b+'" aria-hidden="true"><use href="#l-'+b+'"/></svg>':'<svg class="ic mfb" aria-hidden="true"><use href="#i-chip"/></svg>';
+ if(w.firstChild)img.replaceWith(w.firstChild);}catch(_){}};
+function mpLogoHtml(brand,dom){
+ const d=mpDom(brand)||dom||'';
+ const fb=brand?'<svg class="mlogo" data-b="'+brand+'" aria-hidden="true"><use href="#l-'+brand+'"/></svg>':'<svg class="ic mfb" aria-hidden="true"><use href="#i-chip"/></svg>';
+ if(!d)return fb;
+ return '<img class="mlogo-img" src="'+mpLogoSrc(d,false)+'" data-d="'+esc(d)+'" data-b="'+esc(brand||'')+'" alt="" decoding="async" referrerpolicy="no-referrer" draggable="false" onerror="mpImgErr(this)">';}
 function mpCatItems(c){return c.models.map(m=>({name:c.pre+m[0],desc:m[1],logo:c.logo,pro:true,brand:c.id}));}
 function mpLocalItems(){const ap=activeProvider(),out=[];
  S.settings.providers.forEach(p=>{const ms=[...(p.model?[p.model]:[]),...(p.models||[]).filter(m=>m!==p.model)];
-  ms.forEach(m=>out.push({pid:p.id,m,name:m,desc:p.name,logo:mpBrand(m)||mpBrand(p.name)||'chip',on:!!(ap&&p.id===ap.id&&m===p.model)}));});
+  ms.forEach(m=>out.push({pid:p.id,m,name:m,desc:p.name,logo:mpBrand(m)||mpBrand(p.name)||'chip',dom:mpHost(p.baseUrl),on:!!(ap&&p.id===ap.id&&m===p.model)}));});
  return out;}
 function mpRow(it,i){
- const lg=it.logo==='chip'?'<svg class="ic"><use href="#i-chip"/></svg>':`<svg class="mlogo" data-b="${it.logo}" aria-hidden="true"><use href="#l-${it.logo}"/></svg>`;
+ const lg=mpLogoHtml(it.logo==='chip'?'':it.logo,it.dom);
  return `<button class="mp-row${it.on?' on':''}" style="--i:${Math.min(i,9)}" role="option" aria-selected="${!!it.on}" ${it.pro?'data-pro="1"':`data-mp="${esc(it.pid)}" data-m="${esc(it.m)}"`}>
   <span class="mp-ico">${lg}</span>
   <span class="mp-body"><span class="mp-name"><b>${esc(it.name)}</b>${it.pro?'<i class="mp-pro">Pro</i>':''}</span><span class="mp-desc">${esc(it.desc)}</span></span>
@@ -3179,7 +3195,7 @@ function mpLocalHtml(){
  const ap=activeProvider();let n=0;
  return provs.map(p=>{const ms=[...(p.model?[p.model]:[]),...(p.models||[]).filter(m=>m!==p.model)];
   return `<div class="mp-grp"><div class="mp-gh"><span>${esc(p.name)}</span><button class="mp-chip" data-mfetch="${esc(p.id)}">Fetch models</button></div>
-  ${ms.length?ms.map(m=>mpRow({pid:p.id,m,name:m,desc:p.name,logo:mpBrand(m)||mpBrand(p.name)||'chip',on:!!(ap&&p.id===ap.id&&m===p.model)},n++)).join(''):'<div class="mp-empty-s">No models yet — fetch or add one below.</div>'}
+  ${ms.length?ms.map(m=>mpRow({pid:p.id,m,name:m,desc:p.name,logo:mpBrand(m)||mpBrand(p.name)||'chip',dom:mpHost(p.baseUrl),on:!!(ap&&p.id===ap.id&&m===p.model)},n++)).join(''):'<div class="mp-empty-s">No models yet — fetch or add one below.</div>'}
   <div class="mp-add"><input class="mp-inp" placeholder="Add model manually (id)" data-mmanual="${esc(p.id)}" autocapitalize="off" autocomplete="off" spellcheck="false"><button class="mp-chip pri" data-madd="${esc(p.id)}">Add</button></div></div>`;}).join('');}
 function mpRender(){
  const list=$('#mpList'),tabs=$('#mpTabs');if(!list)return;
@@ -5632,12 +5648,12 @@ function withFast(msgs){const m=(msgs||[]).slice();if(m[0]&&m[0].role==='system'
 async function modelCall(o){
  let fast=false;
  for(let a=0;;a++){let got=false;
-  try{return await providerChat(Object.assign({provider:activeProvider(),reasoning:fastThink(),thinkBudget:true},o,{messages:fast?withFast(o.messages):o.messages,onDelta:d=>{got=true;o.onDelta&&o.onDelta(d);}}));}
+  try{return await providerChat(Object.assign({provider:activeProvider(),reasoning:(fast&&fastThink()==='fast')?'off':fastThink(),thinkBudget:a<2,thinkMs:fast?15000:undefined},o,{messages:fast?withFast(o.messages):o.messages,onDelta:d=>{got=true;o.onDelta&&o.onDelta(d);}}));}
   catch(e){if(e.name==='AbortError')throw e;const msg=String(e.message||''),tb=!!e.thinkBudget,stall=/stopped responding|did not respond/.test(msg),tr=/HTTP (429|5\d\d)|Network error/.test(msg);
    if((!tb&&!tr)||a>=2||got)throw e;
    if(tb||stall)fast=true;
    if(o.onRetry)o.onRetry(tb?'thinking too long':stall?'no response':'server error');
-   await sleep(tb?0:Math.min(4000,800*Math.pow(2,a)),o.signal);}}}
+   await sleep(tb?0:Math.min(1500,300*Math.pow(2,a)),o.signal);}}}
 async function step(o,L){
  const am=o.am,sel=o.sel,ctl=new AbortController();let buf='',cut=false;
  const onAb=()=>ctl.abort();o.signal.addEventListener('abort',onAb,{once:true});
@@ -6037,6 +6053,15 @@ window.__codingAgent={execTool,parseCall,visible,build,changedList,snapBase,chkJ
 .mm-ck{width:18px;height:18px;color:#fff;opacity:0;flex:none}
 .mm-it.on .mm-ck{opacity:1}
 </style>
+<style id="flay-model-logos">
+/* ===== Official company logos in the model picker, top bar and composer ===== */
+.mlogo-img{display:block;flex:none;width:26px;height:26px;object-fit:contain;border-radius:8px;background:#fff;padding:2px;box-sizing:border-box;-webkit-user-drag:none;user-select:none;-webkit-user-select:none}
+.mp-ico .mlogo-img{width:34px;height:34px;border-radius:10px;padding:3px}
+.mtop.logo-only .mlogo-img{width:28px;height:28px}
+.mtop-pj.logo-only .mlogo-img{width:22px;height:22px;border-radius:7px}
+:root:root .composer .cmodel .mlogo-img{width:24px;height:24px;border-radius:7px}
+</style>
+
 <script id="flay-composer-v3-js">
 (function(){'use strict';
 const MODES=[
