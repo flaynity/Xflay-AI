@@ -715,7 +715,7 @@ body.auth-open #toasts{z-index:6000}
         <div class="au-note" id="liErr" role="alert"></div>
         <button class="au-btn" id="liBtn" type="submit"><span class="t">Login</span></button>
         <div class="au-row">
-          <button class="au-rem" id="liRem" type="button" role="checkbox" aria-checked="true"><span class="au-radio"></span><span>Remember me</span></button>
+          <button class="au-rem" id="liRem" type="button" role="checkbox" aria-checked="false"><span class="au-radio"></span><span>Remember me</span></button>
           <button class="au-link" id="liForgot" type="button">Forgot password?</button>
         </div>
       </form>
@@ -755,7 +755,7 @@ body.auth-open #toasts{z-index:6000}
         <div class="au-note" id="suErr" role="alert"></div>
         <button class="au-btn" id="suBtn" type="submit"><span class="t">Sign Up</span></button>
         <div class="au-row">
-          <button class="au-rem" id="suRem" type="button" role="checkbox" aria-checked="true"><span class="au-radio"></span><span>Remember me</span></button>
+          <button class="au-rem" id="suRem" type="button" role="checkbox" aria-checked="false"><span class="au-radio"></span><span>Remember me</span></button>
         </div>
       </form>
       <div class="au-or"><span>OR</span></div>
@@ -1481,7 +1481,7 @@ var overlay=$('auth'),auth=null,cur='welcome',loadingFor=null,revealed=false,res
 var EYE_OFF='<svg viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M10.6 5.1A9.6 9.6 0 0 1 12 5c5 0 8.5 4 9.5 7a11.7 11.7 0 0 1-2.6 3.9M6.6 6.6A11.8 11.8 0 0 0 2.5 12c1 3 4.5 7 9.5 7a9.5 9.5 0 0 0 4.3-1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
 var EYE_ON='<svg viewBox="0 0 24 24"><path d="M2.5 12S6 5 12 5s9.5 7 9.5 7-3.5 7-9.5 7S2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></svg>';
 var EMAIL=/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-var rem={login:true,signup:true};
+var rem={login:false,signup:false};
 document.body.classList.add('auth-open');
 
 var XAuth=window.XAuth={user:null,ready:new Promise(function(r){resolveReady=r;})};
@@ -1555,7 +1555,7 @@ document.querySelectorAll('[data-to]').forEach(function(b){b.addEventListener('c
 
 /* ---- Firebase calls ---- */
 function persist(remember){
- try{var P=firebase.auth.Auth.Persistence;return auth.setPersistence(P.LOCAL).catch(function(){});}catch(e){return Promise.resolve();}
+ try{var P=firebase.auth.Auth.Persistence;return auth.setPersistence(remember?P.LOCAL:P.SESSION).catch(function(){});}catch(e){return Promise.resolve();}
 }
 $('liForm').addEventListener('submit',function(e){
  e.preventDefault();var em=$('liEmail').value.trim(),pw=$('liPw').value,btn=$('liBtn');note('liErr','');
@@ -2411,7 +2411,7 @@ function genCard(m){
  const gf=m.generatedFiles||[];if(!gf.length||m.ops)return '';
  const rows=gf.map((g,i)=>{const st=g.status||'generating',ex=(g.path.split('.').pop()||'').toLowerCase(),nm=g.path.split('/').pop().replace(/\.[^.]+$/,'')||g.path;
   const code='';
-  return `<div class="gcard ${st}" data-gen="${i}"><div class="gc-top"><span class="gc-ic">&lt;/&gt;</span><div class="gc-tx"><b>${esc(nm.charAt(0).toUpperCase()+nm.slice(1))}</b><span>Code \u00b7 ${esc(GC_LANG[ex]||ex.toUpperCase()||'Text')}${g.stat?' \u00b7 '+(g.stat.created?'New':'Modified')+' +'+g.stat.add+' \u2212'+g.stat.del:''}</span></div>${st==='generating'?'<span class="gc-st generating"><i class="gc-dot"></i>Generating</span>':'<span class="gc-go">'+icon('chev-r')+'</span>'}</div>${code?`<pre class="gc-code" data-gcp="${esc(g.path)}">${esc(code.slice(0,30000))}</pre>`:''}</div>`;}).join('');
+  return `<div class="gcard ${st}" data-gen="${i}"><div class="gc-top"><span class="gc-ic">&lt;/&gt;</span><div class="gc-tx"><b>${esc(nm.charAt(0).toUpperCase()+nm.slice(1))}</b><span>Code \u00b7 ${esc(GC_LANG[ex]||ex.toUpperCase()||'Text')}${g.stat?' \u00b7 '+(g.stat.created?'New':'Modified')+' +'+g.stat.add+' \u2212'+g.stat.del:''}</span></div><span class="gc-st ${st}">${st==='generating'?'<i class="gc-dot"></i>Generating':st==='generated'?'Generated':'Failed'}</span></div>${code?`<pre class="gc-code" data-gcp="${esc(g.path)}">${esc(code.slice(0,30000))}</pre>`:''}</div>`;}).join('');
  return `<div class="card gen gcards" data-gsig="${gf.map(g=>g.status).join('|')}">${rows}${m._genErr?`<div class="generr">${icon('alert','xs')}<span>${esc(m._genErr)}</span></div>`:''}</div>`;}
 const GC_LANG={html:'HTML',js:'JavaScript',kt:'Kotlin',java:'Java',css:'CSS',json:'JSON',xml:'XML',py:'Python',ts:'TypeScript',md:'Markdown',gradle:'Gradle',kts:'Kotlin Script'};
 function genTail(m,path){const c=m.content||'',i=c.indexOf('```flayfiles');if(i<0)return '';const body=c.slice(i);const pi=body.indexOf(JSON.stringify(path).slice(0,-1));if(pi<0)return '';const ci=body.slice(pi).search(/"content"\s*:\s*"/);if(ci<0)return '';let t=body.slice(pi+ci).replace(/^"content"\s*:\s*"/,'');let e=0;while(e<t.length){if(t[e]==='\\')e+=2;else if(t[e]==='"')break;else e++;}t=t.slice(0,e);if(t.endsWith('\\'))t=t.slice(0,-1);try{return JSON.parse('"'+t+'"');}catch(_){return t.replace(/\\n/g,'\n').replace(/\\t/g,'\t').replace(/\\"/g,'"').replace(/\\\\/g,'\\');}}
@@ -2602,11 +2602,7 @@ function updateChips(){const p=activeProvider();
  let rl='Reasoning';try{if(p&&p.supportsReasoning)rl=RLV[rlIdx()].l;}catch(_){}
  ['#chipModel','#chipModel2'].forEach(s=>{const el=$(s);if(el){el.querySelector('span').textContent=rl;el.classList.toggle('dis',!(p&&p.supportsReasoning));}});
  const nm=(p&&p.model)?p.model:'Select model';
- const br=p&&p.model?(mpBrand(p.model)||mpBrand(p.name)):null;
- ['#topModel','#topModel2'].forEach(s=>{const el=$(s);if(!el)return;
-  el.setAttribute('aria-label',nm);el.title=nm;
-  if(p&&p.model){el.classList.add('logo-only');el.innerHTML='<span class="mtop-lg">'+mpLogoHtml(br,'lg')+'</span>'+icon('chev-d');}
-  else{el.classList.remove('logo-only');el.innerHTML='<span>Select model</span>'+icon('chev-d');}});
+ ['#topModel','#topModel2'].forEach(s=>{const el=$(s);if(el)el.querySelector('span').textContent=nm;});
 }
 function renderAtts(){const host=$('#chatAtts');
  if(!S.pendingAttachments.length){host.classList.add('hidden');host.innerHTML='';return;}
@@ -2616,7 +2612,7 @@ $('#chatAtts').addEventListener('click',e=>{const b=e.target.closest('[data-rmat
 
 /* ---------- system prompts ---------- */
 const THINK_RULE='Reasoning speed: think ultra fast. Keep your private reasoning short - at most 3 to 5 steps, each a brief bold title line plus one short sentence. Never over-think simple requests.';
-const LINKS_RULE='When the user asks for website link(s) (a site, service, tool, platform, ad network, store, etc.), the application may perform live web research and supply LIVE WEB CONTEXT. Reply directly in the user\'s language. If usable live sources are available, present those results and only use URLs that appear in those sources. Do NOT say "I don\'t have a web-search tool of my own" or make contradictory statements. Output exactly one fenced code block tagged weblinks containing a JSON array of 3 to 8 items (one item if the user asks for one specific site), each shaped like {"name":"Google AdSense","tag":"short category line in the user\'s language","desc":"one or two sentences in the user\'s language","url":"https://official-site.example","open":"short label in the user\'s language"}. If search returns FAILED or NO USABLE RESULTS, state clearly that live verification failed; do not claim any URL was live-verified. For well-known services whose official domain is highly certain from stable knowledge, you MAY provide exact known domains as clearly UNVERIFIED fallback links in the same weblinks block (for example Google AdSense: https://adsense.google.com/, Media.net: https://www.media.net/, PropellerAds: https://propellerads.com/, Adsterra: https://adsterra.com/, Ezoic: https://www.ezoic.com/). Label each fallback as not live-verified. Never guess unfamiliar domains or invent URLs; if uncertain, provide no link. Do not write raw URLs outside the block.';
+const LINKS_RULE='When the user asks for website link(s) (a site, service, tool, platform, ad network, store, etc.), the application automatically performs live web research and supplies verified LIVE WEB CONTEXT. Always reply directly in the user\'s language with a concise, helpful intro sentence presenting the verified results found by the app (for example: "Here are the verified official websites found:" / "এখানে ভেরিফাইড অফিসিয়াল ওয়েবসাইটগুলোর লিংক দেওয়া হলো:"). Do NOT state "I don\'t have a web-search tool of my own" or make contradictory statements. Then output exactly one fenced code block tagged weblinks containing a JSON array of 3 to 8 items, each shaped like {"name":"Google AdSense","tag":"short category line in the user\'s language","desc":"one or two sentences in the user\'s language","url":"https://official-site.example","open":"short label in the user\'s language, e.g. AdSense Website \u0996\u09c1\u09b2\u09c1\u09a8"}. Only put URLs in the block that appear in the SOURCES of the live web context. If the search returned FAILED or NO USABLE RESULTS, do NOT output a weblinks block: state clearly in the user\'s language that the live search could not verify the links. Never invent or guess URLs, and do not write raw URLs outside the block. If the user asks for one specific site, return just that one item.';
 function isLinkIntent(t){t=String(t||'').trim();if(!t||t.length>400)return false;
  const noun=/(\blinks?\b|\burls?\b|\bweb\s?sites?\b|\bsites?\b|\u09b2\u09bf\u0982\u0995|\u09b2\u09bf\u0999\u09cd\u0995|\u0993\u09af\u09bc\u09c7\u09ac\u09b8\u09be\u0987\u099f|\u0993\u09af\u09bc\u09c7\u09ac \u09b8\u09be\u0987\u099f|\u09b8\u09be\u0987\u099f)/i;
  const ask=/(\bgive\b|\bsend\b|\bshare\b|\bshow\b|\bprovide\b|\bfind\b|\bsuggest\b|\brecommend\b|\blist\b|\bneed\b|\bwant\b|\bwhere\b|\bwhich\b|\bbest\b|\btop\b|\u09a6\u09be\u0993|\u09a6\u09bf\u09a8|\u09a6\u09c7\u09a8|\u09a6\u09bf\u09ac\u09c7|\u09a6\u09bf\u09a4\u09c7|\u09a6\u09c7\u0996\u09be\u0993|\u09a6\u09c7\u0996\u09be\u09a8|\u09aa\u09be\u09a0\u09be\u0993|\u099a\u09be\u0987|\u09ac\u09b2\u09cb|\u09ac\u09b2\u09c1\u09a8|\u0996\u09c1\u0981\u099c\u09c7|\u0995\u09cb\u09a5\u09be\u09af\u09bc|\u0995\u09cb\u09a8\u099f\u09be)/i;
@@ -2703,9 +2699,9 @@ async function researchWeb(m,queries,sig,hostSel,opts){
   if(!all.length){
    if(rs.length&&rs.every(r=>r.failed)){const why=[...new Set(rs.map(r=>r.error).filter(Boolean))].join(' | ').slice(0,220)||'search service unreachable';
     m.webSteps.push({t:'Web search failed',d:why});m.webFailed=true;upd();
-    return 'LIVE WEB SEARCH STATUS: FAILED ('+why+'). No live results were obtained. Tell the user, in their language, that live verification failed. Do not claim any URL was live-verified. The assistant may provide exact official domains for common, well-known services only when highly certain, using the weblinks JSON block and clearly labelling them UNVERIFIED; never guess unfamiliar domains.';}
+    return 'LIVE WEB SEARCH STATUS: FAILED ('+why+'). No live results were obtained. Tell the user, in their language, that the live search could not be completed so nothing could be verified. Do NOT present any website or URL as verified or official, and do not build a list of links from memory; if you mention a URL you are certain of, label it clearly as unverified.';}
    m.webSteps.push({t:'Search finished with no usable results',d:''});upd();
-   return 'LIVE WEB SEARCH STATUS: NO USABLE RESULTS for: '+queries.join(' | ')+'. Tell the user, in their language, that the search returned no usable results and live verification failed. The assistant may provide exact official domains for common, well-known services only when highly certain, using the weblinks JSON block and clearly labelling them UNVERIFIED; never guess unfamiliar domains.';}
+   return 'LIVE WEB SEARCH STATUS: NO USABLE RESULTS for: '+queries.join(' | ')+'. Tell the user, in their language, that the search returned nothing usable. Do NOT invent or guess URLs and do not present any link as verified.';}
   m.webSteps.push({t:'Found '+all.length+' web pages',d:all.slice(0,8).map(s=>s.host).join('\n'),srcs:hosts(all)});upd();
   let pages=[];
   if(opts.read!==false){
@@ -2990,7 +2986,6 @@ function threadClick(sel){return e=>{
   const msg=(sel==='#agentMsgs'?(S.project?S.project.agent:[]):(S.chat?S.chat.messages:[])).find(x=>x.id===mid);
   const g=msg&&msg.generatedFiles&&msg.generatedFiles[+gr.dataset.gen];
   if(g&&g.status==='generated'&&!g.deleted)openViewerFile({path:g.path,name:g.name,content:g.content,binary:false},null);
-  else if(g&&g.status==='generating'){openLiveViewer(msg,g);}
   else if(g&&g.deleted)toast('This file was deleted — no content to preview.','warn');
   return;}
  const chg=e.target.closest('.chg-row');if(chg){const d=chg.nextElementSibling;if(d)d.classList.toggle('hidden');return;}
@@ -3140,13 +3135,8 @@ function mpLocalItems(){const ap=activeProvider(),out=[];
  S.settings.providers.forEach(p=>{const ms=[...(p.model?[p.model]:[]),...(p.models||[]).filter(m=>m!==p.model)];
   ms.forEach(m=>out.push({pid:p.id,m,name:m,desc:p.name,logo:mpBrand(m)||mpBrand(p.name)||'chip',on:!!(ap&&p.id===ap.id&&m===p.model)}));});
  return out;}
-const LOGO_DOMAIN={claude:'claude.ai',openai:'openai.com',gemini:'gemini.google.com',deepseek:'deepseek.com',meta:'meta.ai',zai:'z.ai',grok:'grok.com'};
-function mpLogoHtml(b,cls){
- if(!b||b==='chip'||!LOGO_DOMAIN[b])return '<svg class="ic"><use href="#i-chip"/></svg>';
- const fb=`<svg class="mlogo" aria-hidden="true"><use href="#l-${b}"/></svg>`;
- return `<span class="olg ${cls||''}"><img src="https://www.google.com/s2/favicons?domain=${LOGO_DOMAIN[b]}&sz=128" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.parentNode.classList.add('fb');this.outerHTML=this.parentNode.dataset.fb" ></span>`.replace('<span class="olg','<span data-fb="'+fb.replace(/"/g,'&quot;')+'" class="olg');}
 function mpRow(it,i){
- const lg=mpLogoHtml(it.logo);
+ const lg=it.logo==='chip'?'<svg class="ic"><use href="#i-chip"/></svg>':`<svg class="mlogo" aria-hidden="true"><use href="#l-${it.logo}"/></svg>`;
  return `<button class="mp-row${it.on?' on':''}" style="--i:${Math.min(i,9)}" role="option" aria-selected="${!!it.on}" ${it.pro?'data-pro="1"':`data-mp="${esc(it.pid)}" data-m="${esc(it.m)}"`}>
   <span class="mp-ico">${lg}</span>
   <span class="mp-body"><span class="mp-name"><b>${esc(it.name)}</b>${it.pro?'<i class="mp-pro">Pro</i>':''}</span><span class="mp-desc">${esc(it.desc)}</span></span>
@@ -3533,23 +3523,6 @@ function bundleHtml(path,files,seen=new Set()){if(seen.has(path))return '';seen.
  html=html.replace(/\b(src|href)=["']([^"']+)["']/gi,(m,at,ref)=>{const p2=resolve(ref);
   if(p2&&files[p2]&&files[p2].binary&&/^data:image/.test(files[p2].content))return at+'="'+files[p2].content+'"';return m;});
  return html;}
-
-const HL_KW=/\b(?:function|const|let|var|return|if|else|for|while|do|class|import|export|from|new|this|async|await|fun|val|package|public|private|protected|static|final|void|int|long|float|double|String|boolean|true|false|null|undefined|try|catch|finally|switch|case|break|continue|extends|implements|interface|override|def|in|is|as|object|when|throw|typeof|default|enum|struct|self|None|True|False|lambda|with|yield|super|abstract|data|sealed|companion|init|get|set|of)\b/.source;
-function hlCode(text,ext){
- ext=(ext||'').toLowerCase();
- const markup=['html','htm','xml','svg'].includes(ext),hash=['py','sh','yml','yaml','properties','toml'].includes(ext),css=ext==='css',plain=['md','txt','json'].includes(ext);
- const parts=[['cm','\\/\\*[\\s\\S]*?(?:\\*\\/|$)'],['cm',markup?'<!--[\\s\\S]*?(?:-->|$)':null],['cm',(!css&&!hash&&!plain)?'\\/\\/[^\\n]*':null],['cm',hash?'#[^\\n]*':null],
-  ['st','"(?:\\\\.|[^"\\\\\\n])*"?'],['st',"'(?:\\\\.|[^'\\\\\\n])*'?"],['st',(!css&&!markup)?'`(?:\\\\[\\s\\S]|[^`\\\\])*`?':null],
-  ['tg',markup?'<\\/?[A-Za-z][\\w:-]*|\\/?>':null],['at',markup?'\\b[A-Za-z_:][\\w:.-]*(?==)':null],
-  ['pr',css?'[a-z-]+(?=\\s*:)':null],['nm','#[0-9a-fA-F]{3,8}\\b|\\b\\d+(?:\\.\\d+)?(?:px|em|rem|%|dp|sp|vh|vw)?\\b'],['kw',(markup||css||plain&&ext!=='json')?null:HL_KW],['kw',ext==='json'?'\\b(?:true|false|null)\\b':null]].filter(x=>x[1]);
- const re=new RegExp(parts.map(x=>'('+x[1]+')').join('|'),'g'),cls=parts.map(x=>x[0]);
- const E=t=>t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
- let out='',last=0,m;
- const wrap=(c,t)=>t.split('\n').map(l=>l?'<span class="t-'+c+'">'+E(l)+'</span>':'').join('\n');
- while((m=re.exec(text))){if(m[0]==='')break;out+=E(text.slice(last,m.index));let k=1;while(m[k]===undefined)k++;out+=wrap(cls[k-1],m[0]);last=m.index+m[0].length;}
- out+=E(text.slice(last));
- return out.split('\n').map(l=>'<span class="ln">'+l+'</span>').join('');}
-function setVwCode(el,text,ext){try{if(text.length>400000)throw 0;el.innerHTML=hlCode(text,ext);}catch(_){el.textContent=text;}}
 function openViewerFile(f,ctxFiles){
  const name=f.name;const ext=(name.split('.').pop()||'').toLowerCase();
  const canPreview=['html','htm'].includes(ext)||IMG_EXT.includes(ext)||ext==='md'||ext==='json';
@@ -3563,7 +3536,7 @@ function openViewerFile(f,ctxFiles){
   </header>
   <div class="vw-body"><pre class="vw-code" id="vwCode"></pre><div class="vw-preview hidden" id="vwPrev"></div></div></div>`;
  v.classList.add('show');
- setVwCode($('#vwCode'),f.content||'',f.binary?'txt':ext);
+ $('#vwCode').textContent=f.binary?(f.content||''):(f.content||'');
  $('#vwClose').onclick=closeViewer;
  $('#vwCopy').onclick=async()=>{await copyText(f.content||'');const b=$('#vwCopy');b.innerHTML=icon('check','xs')+'<span>Copied</span>';setTimeout(()=>b.innerHTML=icon('copy','xs')+'<span>Full Copy</span>',1400);};
  $('#vwSeg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.disabled)return;
@@ -3581,22 +3554,9 @@ function renderPreview(ext,f,ctxFiles){const el=$('#vwPrev');
  else if(ext==='json'){let pretty=f.content||'';try{pretty=JSON.stringify(JSON.parse(pretty),null,2);}catch(e){}
   el.innerHTML='<pre class="vw-code" style="flex:1"></pre>';el.querySelector('pre').textContent=pretty;}
  else el.innerHTML='<div class="note" style="margin:16px">'+icon('info','sm')+'<span>Preview is not available for this file type.</span></div>';}
-function openLiveViewer(msg,g){
- const nm=g.name||g.path.split('/').pop();
- openViewerFile({path:g.path,name:nm,content:genTail(msg,g.path)||'',binary:false},null);
- const v=$('#viewer');v.dataset.live=g.path;let last=-1;
- if(window._liveT)clearInterval(window._liveT);
- window._liveT=setInterval(()=>{
-  const el=$('#vwCode');
-  if(!el||!v.classList.contains('show')||v.dataset.live!==g.path){clearInterval(window._liveT);return;}
-  const done=g.status!=='generating';
-  const t=done?(g.content||genTail(msg,g.path)||''):genTail(msg,g.path);
-  if(t&&t.length!==last){last=t.length;const atEnd=el.scrollHeight-el.scrollTop-el.clientHeight<80||!done;setVwCode(el,t,(g.path.split('.').pop()||''));if(atEnd){el.scrollTop=el.scrollHeight;const pb=el.parentNode;if(pb)pb.scrollTop=pb.scrollHeight;}}
-  if(done){clearInterval(window._liveT);v.dataset.live='';}
- },120);}
 function openViewer(path){const p=S.project;const f=p.files[path];if(!f)return;
  openViewerFile({path,name:path.split('/').pop(),content:f.content,binary:f.binary},p.files);}
-function closeViewer(){if(window._liveT)clearInterval(window._liveT);$('#viewer').classList.remove('show');$('#viewer').innerHTML='';}
+function closeViewer(){$('#viewer').classList.remove('show');$('#viewer').innerHTML='';}
 
 /* ---------- agent ---------- */
 const agentDraftKey=()=>S.project?'flay.draft.agent.'+S.project.id:null;
@@ -5039,7 +4999,6 @@ Every request follows this loop. For a small request each step is small - but do
 - Range errors: If read_file reports "Range too large", calculate (to - from + 1) <= 300. Never repeat the same failing range. Adjust 'to' immediately and retry with a valid range (e.g. 150 lines).
 - After 2 failed attempts at the same spot, read a wider region and rethink. After 3, stop and tell the user what is blocking you.
 - Never repeat an identical failing call. Read the error first.
-- If `create_file` returns `File already exists: <path>`, treat that as a required recovery step: do NOT call `create_file` again and do NOT delete the existing file. First use `read_file` on that exact path, inspect the existing contents, then use `edit_file` with a unique exact old-text anchor to make only the requested change. If the file is not included in the current context, use `NEED: <path>` or read it before editing. Only use `create_file` when `list_files`/workspace state confirms the path does not exist.
 - If check_syntax reports an error, fix it immediately and check again. Never deliver a file with a syntax error that you know about; if you cannot fix it, say so plainly.
 - If you made a wrong edit, undo it with another edit_file and confirm with diff.
 - Step budget: a typical task needs fewer than about 40 tool calls. If the request is bigger, work in phases: finish and verify phase 1, report it, and say what remains.
@@ -5741,9 +5700,7 @@ function agentBtn(on){const b=$('#agentSend');if(b)b.innerHTML=icon(on?'stop':'s
 const _msgHtml=window.msgHtml;
 function footHtml(m){
  let h='';const ex=m.exports||[];
- if(ex.length)h+=ex.map((x,i)=>{const nn=String(x.name||''),ee=(nn.split('.').pop()||'').toLowerCase(),bs=nn.replace(/\.[^.]+$/,'')||nn;
-  const sub=x.mode==='zip'?'Code \u00b7 ZIP \u00b7 '+x.count+' files':'Code \u00b7 '+(GC_LANG[ee]||ee.toUpperCase()||'Text');
-  return '<button type="button" class="ca-dl" data-ca-dl="'+i+'"><span class="gc-ic">&lt;/&gt;</span><span class="ca-dl-t"><b>'+esc(bs.charAt(0).toUpperCase()+bs.slice(1))+'</b><i>'+esc(sub)+'</i></span><span class="gc-go">'+icon('chev-r')+'</span></button>';}).join('');
+ if(ex.length)h+=ex.map((x,i)=>'<button type="button" class="ca-dl" data-ca-dl="'+i+'">'+icon(x.mode==='zip'?'zip':'file','sm')+'<span class="ca-dl-t"><b>'+esc(x.name)+'</b><i>'+(x.mode==='zip'?x.count+' files':fmtBytes(x.size))+'</i></span>'+icon('download','sm')+'</button>').join('');
  const can=!m.caProject&&!m.caUndone&&m.caUndo&&Object.keys(m.caUndo).length&&S.chat&&S.chat.ws&&S.chat.ws.lastRun&&S.chat.ws.lastRun.messageId===m.id;
  if(can)h+='<button type="button" class="btn sm ca-undo" data-ca-undo="'+m.id+'">'+icon('back','sm')+'Undo this run</button>';
  else if(m.caUndone)h+='<span class="ca-undone muted small">Changes undone</span>';
@@ -5765,28 +5722,13 @@ async function download(m,idx){
    const blob=f.binary?await (await fetch(f.content)).blob():new Blob([f.content||''],{type:'text/plain;charset=utf-8'});await saveBlob(blob,x.name);}
   else{const blob=await zipProject({files});await saveBlob(blob,x.name);}
  }catch(e){toast('Download failed: '+(e.message||e),'err');}}
-function openExport(m,idx){
- const x=(m.exports||[])[idx];if(!x)return;
- const files=m.caProject?(S.project&&S.project.files):(S.chat&&S.chat.ws&&S.chat.ws.files);
- if(!files){toast('The workspace is not available.','warn');return;}
- if(x.mode==='file'){const f=files[x.path];if(!f){toast(x.path+' no longer exists in the workspace.','warn');return;}
-  openViewerFile({path:x.path,name:x.name,content:f.content,binary:!!f.binary},files);return;}
- const names=Object.keys(files).sort();
- let o=document.getElementById('zipSheet');if(o)o.remove();
- o=document.createElement('div');o.id='zipSheet';o.className='zip-ov';
- o.innerHTML='<div class="zip-box"><div class="zip-h"><b>'+esc(x.name)+'</b><button class="btn sm" id="zipDl">'+icon('download','xs')+' Download</button><button class="ibtn" id="zipX" aria-label="Close">'+icon('x')+'</button></div><div class="zip-l">'+names.map((n,i)=>'<button class="zip-r" data-zi="'+i+'"><span class="gc-ic sm">&lt;/&gt;</span><span class="ca-dl-t"><b>'+esc(n.split('/').pop())+'</b><i>'+esc(n)+'</i></span><span class="gc-go sm">'+icon('chev-r')+'</span></button>').join('')+'</div></div>';
- document.body.appendChild(o);
- o.addEventListener('click',e=>{
-  if(e.target===o||e.target.closest('#zipX')){o.remove();return;}
-  if(e.target.closest('#zipDl')){download(m,idx);return;}
-  const r=e.target.closest('[data-zi]');if(r){const n=names[+r.dataset.zi],f=files[n];o.remove();openViewerFile({path:n,name:n.split('/').pop(),content:f.content,binary:!!f.binary},files);}});}
 async function undo(m){
  const ws=S.chat&&S.chat.ws;if(!ws||!ws.lastRun||ws.lastRun.messageId!==m.id||!m.caUndo)return;
  if(!await confirmDlg({title:'Undo this run?',body:'The files changed in this run will be restored to how they were before it.',ok:'Undo'}))return;
  Object.keys(m.caUndo).forEach(p=>{const b=m.caUndo[p];if(b===null)delete ws.files[p];else ws.files[p]={content:b.content,binary:b.binary||undefined};});
  m.caUndone=true;ws.lastRun=null;persistChat();renderThread('#msgs',S.chat.messages);toast('Changes undone.','ok');}
 document.addEventListener('click',e=>{
- const d=e.target.closest('[data-ca-dl]');if(d){const me=d.closest('[data-mid]'),m=me&&findMsg(me.dataset.mid);if(m)openExport(m,+d.dataset.caDl);return;}
+ const d=e.target.closest('[data-ca-dl]');if(d){const me=d.closest('[data-mid]'),m=me&&findMsg(me.dataset.mid);if(m)download(m,+d.dataset.caDl);return;}
  const u=e.target.closest('[data-ca-undo]');if(u){const m=findMsg(u.dataset.caUndo);if(m)undo(m);}});
 
 /* test hook (no UI effect) */
@@ -5795,45 +5737,3 @@ window.__codingAgent={execTool,parseCall,visible,build,changedList,snapBase,chkJ
 </script>
 </body>
 </html>
-<style id="xflay-ui-patch">
-.olg{width:26px;height:26px;border-radius:50%;background:#fff;display:inline-flex;align-items:center;justify-content:center;overflow:hidden;flex:none}
-.olg img{width:78%;height:78%;object-fit:contain;display:block}
-.olg.fb .mlogo,.olg .mlogo{width:70%;height:70%;color:#111}
-.mp-ico .olg{width:30px;height:30px}
-.mtop.logo-only{padding:0 10px;gap:5px}
-.mtop-lg{display:inline-flex;overflow:visible!important}
-.mtop-lg .olg.lg{width:28px;height:28px}
-.mtop-pj.logo-only{height:36px}.mtop-pj .mtop-lg .olg.lg{width:22px;height:22px}
-.gcard,.ca-dl{position:relative;display:flex;align-items:center;gap:14px;width:100%;box-sizing:border-box;padding:12px 14px;border-radius:30px;border:1.5px solid transparent;color:#fff;text-align:left;cursor:pointer;
- background:linear-gradient(135deg,rgba(24,24,28,.96),rgba(8,8,10,.98)) padding-box,linear-gradient(135deg,#ff8a1f,rgba(255,138,31,.25) 45%,#ff6a00) border-box;
- box-shadow:0 0 18px rgba(255,120,20,.28),inset 0 1px 0 rgba(255,255,255,.06);-webkit-tap-highlight-color:transparent;overflow:visible}
-.gcard:active,.ca-dl:active{transform:scale(.98)}
-.gcard{flex-wrap:wrap}.gcard .gc-top{flex:1 1 100%;min-width:0;gap:14px}.gcard .gc-tx{flex:1}.gcard .gc-code{flex:1 1 100%;margin:4px 4px 2px;max-height:170px;border:1px solid rgba(255,138,31,.2);background:#0b0b0d}
-.gc-ic{width:54px;height:54px;border-radius:17px;background:linear-gradient(145deg,#2a2a2f,#121214);border:1px solid rgba(255,255,255,.1);color:#ff8a1f;display:flex;align-items:center;justify-content:center;font:800 19px ui-monospace,monospace;flex:none;text-shadow:0 0 10px rgba(255,138,31,.6)}
-.gc-ic.sm{width:40px;height:40px;border-radius:13px;font-size:15px}
-.gc-tx b,.ca-dl-t b{font-size:19px;font-weight:700;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.gc-tx span,.ca-dl-t i{font-size:14px;color:#9a9aa2;font-style:normal}
-.ca-dl-t{flex:1;min-width:0}
-.gc-go{width:42px;height:42px;border-radius:50%;background:linear-gradient(145deg,#ff9a2e,#ff5e00);color:#fff;display:inline-flex;align-items:center;justify-content:center;flex:none;box-shadow:0 0 14px rgba(255,120,20,.55)}
-.gc-go .ic{width:20px;height:20px;stroke-width:2.8;color:#fff}.gc-go.sm{width:32px;height:32px}
-.gcard .gc-dot{margin-right:14px;flex:none}
-.ca-dl .ic{color:inherit}
-.ca-foot{flex-direction:column;align-items:stretch}
-.zip-ov{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center}
-.zip-box{width:100%;max-width:560px;max-height:80vh;background:#121214;border-radius:26px 26px 0 0;border:1px solid rgba(255,138,31,.35);display:flex;flex-direction:column;padding:14px;gap:10px}
-.zip-h{display:flex;align-items:center;gap:10px}.zip-h b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#fff}
-.zip-l{overflow:auto;display:flex;flex-direction:column;gap:8px;padding-bottom:env(safe-area-inset-bottom)}
-.zip-r{display:flex;align-items:center;gap:12px;padding:8px 10px;border-radius:20px;background:#1b1b1f;border:1px solid rgba(255,255,255,.08);color:#fff;text-align:left}
-.zip-r .ca-dl-t b{font-size:15px}.zip-r .ca-dl-t i{font-size:12px}
-
-/* code viewer: line numbers, colors, top position */
-#viewer .ov-body{padding-top:0!important}
-#viewer .topbar{padding-top:calc(env(safe-area-inset-top) + 2px)!important;min-height:50px}
-.vw-code{counter-reset:ln;color:#d6deeb;background:#0b0d12!important;padding:12px 14px 40px 0!important;tab-size:2}
-.vw-code .ln{display:block;counter-increment:ln;min-height:1.6em;padding-left:calc(3.6ch + 26px);position:relative}
-.vw-code .ln::before{content:counter(ln);position:absolute;left:0;width:3.6ch;margin-left:10px;text-align:right;color:#4b5263;user-select:none}
-.t-cm{color:#6b7a90;font-style:italic}.t-st{color:#c3e88d}.t-nm{color:#f78c6c}.t-kw{color:#c792ea}.t-tg{color:#ff6b81}.t-at{color:#ffcb6b}.t-pr{color:#82aaff}
-[data-theme=light] .vw-code{background:#f7f8fb!important;color:#2b3040}
-[data-theme=light] .t-cm{color:#8a94a6}[data-theme=light] .t-st{color:#2e8b3d}[data-theme=light] .t-nm{color:#d4572b}[data-theme=light] .t-kw{color:#8a3fc7}[data-theme=light] .t-tg{color:#d6264a}[data-theme=light] .t-at{color:#b7791f}[data-theme=light] .t-pr{color:#2f5fd0}
-.gc-st.generating{color:#ff9a2e;font-size:13px;font-weight:600;margin-right:2px}.gcard .gc-st .gc-dot{margin:0}
-</script>    
