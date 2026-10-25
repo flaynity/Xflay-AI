@@ -5044,7 +5044,7 @@ Tool results come back as plain text. Make one call at a time. You may group sev
 - **read_file(path, from, to)** - Returns lines from..to (1-based, inclusive). Both endpoints are inclusive, so the line count is (to - from + 1). A read is capped at 300 lines per call (aim for 150 or fewer). Example: lines 1 to 300 is exactly 300 lines (300 - 1 + 1 = 300). Requesting lines 300 to 600 is 301 lines (600 - 300 + 1 = 301) and will FAIL! To continue reading after line 300, use from=301, to=450 or from=301, to=600. For large files, use list_files to check total line count, then read in sequential, non-overlapping chunks (e.g. 1-150, 151-300, 301-450). Omit from and to only for files of 300 lines or fewer.
 - **search(pattern, path, regex)** - Case-insensitive literal search across all files, or only in path if given. Set regex to true for a regular expression. Returns up to 50 matches formatted like: index.html:412| matching line text. If results are cut off, narrow the pattern.
 - **edit_file(path, old, new)** - Replaces old with new in an existing file. old must match the current text exactly (whitespace, quotes, and non-ASCII text such as Bengali) and must occur exactly once. No match returns an error. More than one match returns an error listing the line numbers. new may be empty to delete text. Never put the line-number prefixes from read_file into old or new.
-- **create_file(path, content)** - Creates a new file. Fails if the path already exists.
+- **create_file(path, content, allow_empty)** - Creates a new file. Fails if the path already exists. Normally empty or comment-only content is refused. When the user explicitly asks for empty/blank files, call create_file with content "" and "allow_empty": true (one call per file, no placeholder text, no comments). Never use allow_empty for files that should contain code.
 - **delete_file(path)** - Deletes a file from the working copy.
 - **check_syntax(path)** - Checks JS, JSON, script blocks inside HTML, and brace balance of CSS and style blocks. Returns OK or ERROR path:line:col message. Returns UNSUPPORTED for other file types; then tell the user that file was not syntax-checked. It does not catch logic errors or missing elements.
 - **diff(path)** - Unified diff between the original and the current working copy (a new file shows as all additions).
@@ -5362,9 +5362,11 @@ function tCreate(run,a){
  if(badPath(path))return E('Invalid path "'+(a.path||'')+'". Use a relative path with forward slashes and no "..".');
  if(run.files[path])return E('File already exists: '+path+'. Use edit_file to change it (or delete_file, then create_file, for a full rewrite of a small file).');
  if(typeof a.content!=='string')return E('content is required (a string).');
- {const why=placeholderWhy(path,a.content);if(why)return E('Refusing to create '+path+' because '+why+'. Write the complete, working file content (no placeholders, no "rest unchanged" comments).');}
+ const allowEmpty=a.allow_empty===true||/^(true|1|yes)$/i.test(String(a.allow_empty||''));
+ {const why=(allowEmpty&&!REST_MARK.test(a.content))?null:placeholderWhy(path,a.content);if(why)return E('Refusing to create '+path+' because '+why+'. Write the complete, working file content (no placeholders, no "rest unchanged" comments).'+(/empty|only comments/.test(why)?' If the user explicitly asked for an empty/blank file, call create_file again with "content": "" and "allow_empty": true.':''));}
  if(a.content.length>TEXT_CAP)return E('content is too large ('+a.content.length+' chars). Create a smaller skeleton, then add sections with edit_file.');
  run.files[path]={content:a.content};
+ if(allowEmpty&&!a.content.trim()){run.checked[path]=a.content;run.diffed[path]=a.content;return R('OK created empty file '+path+'.','Created '+path,'file',true,'empty file',true);}
  return R('OK created '+path+' ('+lc(a.content)+' lines).','Created '+path,'file',true,lc(a.content)+' lines',true);}
 function tDelete(run,a){
  const path=normPath(a.path);if(!run.files[path])return E('File not found: '+path);
