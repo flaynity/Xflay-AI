@@ -855,9 +855,10 @@ body.auth-open #toasts{z-index:6000}
       <div class="crow">
         <button class="cbtn" id="btnPlus" aria-label="Attach"><svg class="ic"><use href="#i-plus"/></svg></button>
         <button class="cbtn" id="chipWeb" aria-label="Web"><svg class="ic sm"><use href="#i-globe"/></svg></button>
+        <button class="wm-btn" type="button" aria-label="Mode"><span>New</span><svg class="ic xs"><use href="#i-chev-d"/></svg></button>
         <span class="c-sep"></span>
         <div class="cgrow"></div>
-        <button class="mchip" id="chipModel" aria-label="Reasoning effort"><svg class="ic"><use href="#i-brain"/></svg><span>Reasoning</span></button>
+        <button class="cbtn brain-btn" id="chipModel" aria-label="Reasoning effort" title="Reasoning effort"><svg class="ic"><use href="#i-brain"/></svg><span>Reasoning</span></button>
         <button class="cbtn send" id="btnSend" aria-label="Send"><svg class="ic"><use href="#i-send"/></svg></button>
       </div>
     </div>
@@ -1053,7 +1054,6 @@ body.auth-open #toasts{z-index:6000}
     <div class="pj-foot"><button class="btn primary big" id="pjOpenComposer"><svg class="ic"><use href="#i-spark"/></svg>Open Composer</button></div>
   </div>
   <div class="pane" id="pjAgent">
-    <button class="mtop mtop-pj" id="topModel2" aria-haspopup="dialog" aria-label="Select model"><span>Select model</span><svg class="ic"><use href="#i-chev-d"/></svg></button>
     <div class="scrollpane" id="agentScroll"><div class="msgs" id="agentMsgs"></div></div>
     <div class="composer">
       <div class="atts hidden" id="agentAtts"></div>
@@ -1065,9 +1065,11 @@ body.auth-open #toasts{z-index:6000}
         <div class="crow">
           <button class="cbtn" id="agentPlus" aria-label="Attach"><svg class="ic"><use href="#i-plus"/></svg></button>
           <button class="cbtn" id="chipWeb2" aria-label="Web"><svg class="ic sm"><use href="#i-globe"/></svg></button>
+          <button class="wm-btn" type="button" aria-label="Mode"><span>New</span><svg class="ic xs"><use href="#i-chev-d"/></svg></button>
           <span class="c-sep"></span>
           <div class="cgrow"></div>
-          <button class="mchip" id="chipModel2" aria-label="Reasoning effort"><svg class="ic"><use href="#i-brain"/></svg><span>Reasoning</span></button>
+          <button class="pjmodel" id="topModel2" aria-haspopup="dialog" aria-label="Select model"><span>Select model</span><svg class="ic"><use href="#i-chev-d"/></svg></button>
+          <button class="cbtn brain-btn" id="chipModel2" aria-label="Reasoning effort" title="Reasoning effort"><svg class="ic"><use href="#i-brain"/></svg><span>Reasoning</span></button>
           <button class="cbtn send" id="agentSend" aria-label="Send"><svg class="ic"><use href="#i-send"/></svg></button>
         </div>
       </div>
@@ -2966,7 +2968,7 @@ async function sendChat(){if(S.streaming)return;
     const um=S.chat.messages[S.chat.messages.length-2];if(ctx)um.webContext=ctx;
    }
   }
-  await providerChat({provider:activeProvider(),messages:buildChatMessages(S.chat),signal:S.abort.signal,reasoning:fastThink(),
+  await providerChat({provider:activeProvider(),messages:window.withMode(buildChatMessages(S.chat),'chat'),signal:S.abort.signal,reasoning:fastThink(),
   onDelta:d=>{am.content+=d;syncGenFiles(am);updateLive(am,'#msgs');},
   onReasoning:r=>{if(!am.thinkT0)am.thinkT0=Date.now();am.reasoning=(am.reasoning||'')+r;updateLive(am,'#msgs');}});
   await typerDrain(am,'#msgs',S.abort&&S.abort.signal);
@@ -3039,6 +3041,31 @@ async function readIn(files,target){for(const f of files){
   else{const txt=await f.text();(target==='chat'?S.pendingAttachments:S.agentAttachments).push({kind:'text',name:f.name,size:f.size,content:txt});}
  }catch(err){toast('Could not read '+f.name+': '+err.message,'err');}}
  if(target==='chat')renderAtts();else renderAgentAtts();}
+
+/* ---------- work mode (New button: Auto / Plan / Build) ---------- */
+window.WORK_MODE=window.WORK_MODE||'auto';
+window.WORK_MODES=[{k:'auto',t:'Auto',d:'Works as it does now'},{k:'plan',t:'Plan',d:'Makes a plan first, then builds'},{k:'build',t:'Build',d:'Builds directly, no plan'}];
+window.modeDirective=function(kind){const m=window.WORK_MODE;
+ if(m==='plan')return kind==='agent'?'\n\n[Work mode: Plan] Put a short numbered plan (3 to 6 steps) of exactly what you will change in the summary field, then carry out that plan in the files.':'\n\n[Work mode: Plan] First write a short numbered plan of how you will handle this request, then give the full result.';
+ if(m==='build')return kind==='agent'?'\n\n[Work mode: Build] Skip any plan or discussion. Implement the request directly in the files, with a one-line summary.':'\n\n[Work mode: Build] Skip any plan or preamble and give the finished result directly.';
+ return '';};
+window.withMode=function(msgs,kind){const d=window.modeDirective(kind);if(!d||!Array.isArray(msgs))return msgs;const out=msgs.slice();
+ for(let i=out.length-1;i>=0;i--){const x=out[i];if(x&&x.role==='user'){
+  if(typeof x.content==='string')out[i]=Object.assign({},x,{content:x.content+d});
+  else if(Array.isArray(x.content))out[i]=Object.assign({},x,{content:x.content.concat([{type:'text',text:d}])});
+  break;}}
+ return out;};
+window.closeWorkModePop=function(){const p=document.getElementById('wmPop');if(p)p.remove();document.removeEventListener('click',wmOutside,true);};
+function wmOutside(e){const p=document.getElementById('wmPop');if(p&&!p.contains(e.target)&&!e.target.closest('.wm-btn'))window.closeWorkModePop();}
+window.openWorkModePop=function(anchor){window.closeWorkModePop();
+ const pop=document.createElement('div');pop.id='wmPop';pop.className='wm-pop';pop.setAttribute('role','menu');
+ pop.innerHTML=window.WORK_MODES.map(o=>{const on=o.k===window.WORK_MODE;return '<button type="button" class="wm-opt'+(on?' on':'')+'" data-k="'+o.k+'" role="menuitemradio" aria-checked="'+on+'"><span class="wm-tx"><b>'+o.t+'</b><small>'+o.d+'</small></span><span class="wm-ck">'+(on?'\u2713':'')+'</span></button>';}).join('');
+ document.body.appendChild(pop);
+ const r=anchor.getBoundingClientRect(),w=Math.min(260,window.innerWidth-24);
+ pop.style.width=w+'px';pop.style.left=Math.max(12,Math.min(window.innerWidth-w-12,r.left))+'px';pop.style.bottom=(window.innerHeight-r.top+8)+'px';
+ pop.querySelectorAll('.wm-opt').forEach(b=>b.onclick=e=>{e.stopPropagation();window.WORK_MODE=b.dataset.k;window.closeWorkModePop();const t=window.WORK_MODES.find(x=>x.k===window.WORK_MODE).t;toast('Mode: '+t,'info');});
+ document.addEventListener('click',wmOutside,true);};
+document.querySelectorAll('.wm-btn').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();if(document.getElementById('wmPop'))window.closeWorkModePop();else window.openWorkModePop(b);}));
 
 /* ---------- model selector ---------- */
 const RLV=[{k:'fast',l:'Low'},{k:'balanced',l:'Medium'},{k:'deep',l:'High'},{k:'extra',l:'Extra'},{k:'max',l:'Max'}];
@@ -4638,7 +4665,7 @@ async function retryQueue(mid){if(S.agentStreaming)return;const p=S.project,am=p
  const f=am.queue.find(x=>x.status==='failed');if(f)f.status='retrying';
  try{await runQueue(am);}finally{finishAgent(am);}}
 
-async function sendAgent2(){if(S.agentStreaming)return;const p=S.project;if(!p)return;const inp=$('#agentInput'),text=inp.value.trim(),atts=S.agentAttachments.slice();if(!text&&!atts.length)return;if(!activeProvider()){toast('Set up an AI provider first (Menu > Set Up AI).','warn');renderProviders();openScreen('screen-providers');return;}if(!activeProvider().model){toast('No model selected. Tap the model name at the top to choose one.','warn');openModelSheet();return;}const errAtt=atts.find(a=>a.path==='build-failed.log'),fromBuild=!!(S._fixPending&&errAtt);S._fixPending=false;p.agent.push({id:uid(),role:'user',content:text||'(selected files)',attachments:atts.map(a=>({name:a.path||a.name,size:a.size,kind:a.kind})),createdAt:Date.now(),status:'done'});S.agentAttachments=[];inp.value='';if(agentDraftKey())Cloud.draft.del(agentDraftKey());autoGrow(inp);renderAgentAtts();const am={id:uid(),role:'assistant',content:'',createdAt:Date.now(),status:'streaming',activity:[],queue:[],task:text||'Work with the attached files.',reads:atts.filter(a=>a.kind!=='image').map(a=>a.path||a.name),fromBuild,errText:errAtt?errAtt.content||'':'',extra:atts.filter(a=>a!==errAtt&&typeof a.content==='string').map(a=>({path:a.path||a.name,content:a.content.slice(0,ATT_BUDGET)}))};p.agent.push(am);renderThread('#agentMsgs',p.agent);startReply('#agentMsgs',am.id);S.agentStreaming=true;S.agentAbort=new AbortController();updateSendBtn();try{if(isLinkIntent(text)&&!atts.length){try{await agentLinkReply(am,text);}finally{am._webSearching=false;}return;}const evU=agStart(am,'Understanding the request','search');let webCtx='';if(S.webAccess&&!am.fromBuild&&text&&!atts.length){const hd=p.agent.filter(x=>x!==am&&x.status==='done'&&x.content).slice(0,-1).slice(-4);const dec=await decideSearch(text,hd,S.agentAbort.signal,'The user is talking to a coding agent that builds Android WebView apps and websites inside a project.');if(dec.search&&dec.queries.length)webCtx=await researchWeb(am,dec.queries,S.agentAbort.signal,'#agentMsgs');}let hits=am.errText?filesInText(p,am.errText,true):[];filesInText(p,text,false).forEach(x=>{if(!hits.includes(x))hits.push(x)});const given=new Set(am.extra.map(a=>a.path));hits=hits.filter(x=>!given.has(x)).slice(0,3);let ctx='',used=0;const read=[];for(const x of hits){const f=p.files[x];if(!f||f.binary)continue;const cc=f.content||'';if(used+cc.length>30000)continue;used+=cc.length;read.push(x);ctx+='\n### FILE: '+x+'\n'+cc+'\n### END FILE\n'}agAct(am,read.length?'Read '+read.join(', ')+' (targeted)':'Planning from project file list',read.length?'file':'info');let up='TASK:\n'+am.task;if(am.errText)up+='\n\nREAL FAILURE LOG:\n'+errSummary(am.errText);am.extra.forEach(a=>{up+='\n\nATTACHED FILE '+a.path+':\n'+a.content});if(webCtx)up+='\n\nLIVE WEB CONTEXT (fresh research done for this request; use the concrete details in it):\n'+webCtx.slice(0,9000);up+='\n\nPROJECT FILE LIST:\n'+Object.keys(p.files).sort().slice(0,400).join('\n')+'\n\nFILES ALREADY READ:'+(ctx||' none')+'\n\nRECENT PROJECT CHANGES (earlier in this chat): '+(recentChanges(p,am).join(', ')||'none')+'\n\nCONVERSATION RULES: First decide the intent of the LATEST user message, using earlier messages for context (a follow-up such as "make it black" refers to the work already discussed). Intents: greeting, chat, question, project_question, explain, inspect, code_change, bug_fix, build_fix, clarify. For greeting/chat/question/project_question/explain/inspect/clarify, answer naturally in the language the user writes in, put the reply in "answer", keep files [], and NEVER mention build errors, infrastructure or file changes. Use clarify only if a code request is truly ambiguous. For clarify set "questions" to {"groups":[{"q":"question text","options":["choice 1","choice 2"]}],"button":"short action label"} written from the real context in the language of the user (1 to 4 groups, 2 to 6 options each, no numbering); otherwise questions is null. Set "infrastructure" true ONLY when a REAL FAILURE LOG is attached above and shows no project-code error; otherwise it is always false.\n\nReturn ONLY one JSON object: {"intent":"","analysis":{"root_cause":"","failed_task":"","failed_step":"","error_type":"","error_file":"","error_line":null,"relevant_dependency":null,"recommended_fix":""},"infrastructure":false,"summary":"one short line","answer":"reply text when no file change is needed, else empty","questions":null,"files":[{"path":"relative/path","action":"modify|create|delete","reason":"short","refs":[]}]}. For a code change or bug fix list only the files that must change (minimal set)."';const hist=p.agent.filter(m=>m!==am&&m.status==='done'&&m.content).slice(0,-1).slice(-6).map(m=>({role:m.role,content:m.content}));let raw='';const tP=Date.now();await providerChat({provider:activeProvider(),messages:[{role:'system',content:AG_SYS},...hist,{role:'user',content:up}],signal:S.agentAbort.signal,reasoning:'fast',onDelta:d=>{raw+=d;const pa=partialAnswer(raw);if(pa&&pa!==am.content){am.content=pa;updateLive(am,'#agentMsgs');}},onReasoning:think(am)});let plan;try{plan=JSON.parse((raw.match(/\{[\s\S]*\}/)||[''])[0])}catch(_){plan=null}if(!plan||typeof plan!=='object'){if(!am.fromBuild&&!am.errText&&raw.trim())plan={intent:'chat',answer:raw.trim(),files:[]};else throw new Error('The model did not return a valid plan. Try again.');}const seen=new Set();am.queue=(plan.files||[]).map(f=>({path:normPath(f&&f.path),action:String(f&&f.action||'modify').toLowerCase(),reason:String(f&&f.reason||''),refs:((f&&f.refs)||[]).map(normPath).filter(r=>p.files[r]).slice(0,2)})).filter(f=>f.path&&!isUnsafe(f.path)&&!seen.has(f.path)&&seen.add(f.path)).slice(0,12).map(f=>{if(f.action!=='delete')f.action=p.files[f.path]?'modify':'create';f.status='queued';return f});am.plan=String(plan.summary||'');const an=plan.analysis||{};if(an.root_cause&&(am.fromBuild||am.errText))agAct(am,'Root cause: '+String(an.root_cause).slice(0,300)+(an.error_file?' ('+an.error_file+(an.error_line?':'+an.error_line:'')+')':''),'search');const intent=String(plan.intent||'').toLowerCase().replace(/[^a-z_]/g,''),talk=/^(greeting|chat|question|project_question|explain|inspect|clarify|identity)$/.test(intent);if(talk)am.queue=[];
+async function sendAgent2(){if(S.agentStreaming)return;const p=S.project;if(!p)return;const inp=$('#agentInput'),text=inp.value.trim(),atts=S.agentAttachments.slice();if(!text&&!atts.length)return;if(!activeProvider()){toast('Set up an AI provider first (Menu > Set Up AI).','warn');renderProviders();openScreen('screen-providers');return;}if(!activeProvider().model){toast('No model selected. Tap the model name at the top to choose one.','warn');openModelSheet();return;}const errAtt=atts.find(a=>a.path==='build-failed.log'),fromBuild=!!(S._fixPending&&errAtt);S._fixPending=false;p.agent.push({id:uid(),role:'user',content:text||'(selected files)',attachments:atts.map(a=>({name:a.path||a.name,size:a.size,kind:a.kind})),createdAt:Date.now(),status:'done'});S.agentAttachments=[];inp.value='';if(agentDraftKey())Cloud.draft.del(agentDraftKey());autoGrow(inp);renderAgentAtts();const am={id:uid(),role:'assistant',content:'',createdAt:Date.now(),status:'streaming',activity:[],queue:[],task:text||'Work with the attached files.',reads:atts.filter(a=>a.kind!=='image').map(a=>a.path||a.name),fromBuild,errText:errAtt?errAtt.content||'':'',extra:atts.filter(a=>a!==errAtt&&typeof a.content==='string').map(a=>({path:a.path||a.name,content:a.content.slice(0,ATT_BUDGET)}))};p.agent.push(am);renderThread('#agentMsgs',p.agent);startReply('#agentMsgs',am.id);S.agentStreaming=true;S.agentAbort=new AbortController();updateSendBtn();try{if(isLinkIntent(text)&&!atts.length){try{await agentLinkReply(am,text);}finally{am._webSearching=false;}return;}const evU=agStart(am,'Understanding the request','search');let webCtx='';if(S.webAccess&&!am.fromBuild&&text&&!atts.length){const hd=p.agent.filter(x=>x!==am&&x.status==='done'&&x.content).slice(0,-1).slice(-4);const dec=await decideSearch(text,hd,S.agentAbort.signal,'The user is talking to a coding agent that builds Android WebView apps and websites inside a project.');if(dec.search&&dec.queries.length)webCtx=await researchWeb(am,dec.queries,S.agentAbort.signal,'#agentMsgs');}let hits=am.errText?filesInText(p,am.errText,true):[];filesInText(p,text,false).forEach(x=>{if(!hits.includes(x))hits.push(x)});const given=new Set(am.extra.map(a=>a.path));hits=hits.filter(x=>!given.has(x)).slice(0,3);let ctx='',used=0;const read=[];for(const x of hits){const f=p.files[x];if(!f||f.binary)continue;const cc=f.content||'';if(used+cc.length>30000)continue;used+=cc.length;read.push(x);ctx+='\n### FILE: '+x+'\n'+cc+'\n### END FILE\n'}agAct(am,read.length?'Read '+read.join(', ')+' (targeted)':'Planning from project file list',read.length?'file':'info');let up='TASK:\n'+am.task+window.modeDirective('agent');if(am.errText)up+='\n\nREAL FAILURE LOG:\n'+errSummary(am.errText);am.extra.forEach(a=>{up+='\n\nATTACHED FILE '+a.path+':\n'+a.content});if(webCtx)up+='\n\nLIVE WEB CONTEXT (fresh research done for this request; use the concrete details in it):\n'+webCtx.slice(0,9000);up+='\n\nPROJECT FILE LIST:\n'+Object.keys(p.files).sort().slice(0,400).join('\n')+'\n\nFILES ALREADY READ:'+(ctx||' none')+'\n\nRECENT PROJECT CHANGES (earlier in this chat): '+(recentChanges(p,am).join(', ')||'none')+'\n\nCONVERSATION RULES: First decide the intent of the LATEST user message, using earlier messages for context (a follow-up such as "make it black" refers to the work already discussed). Intents: greeting, chat, question, project_question, explain, inspect, code_change, bug_fix, build_fix, clarify. For greeting/chat/question/project_question/explain/inspect/clarify, answer naturally in the language the user writes in, put the reply in "answer", keep files [], and NEVER mention build errors, infrastructure or file changes. Use clarify only if a code request is truly ambiguous. For clarify set "questions" to {"groups":[{"q":"question text","options":["choice 1","choice 2"]}],"button":"short action label"} written from the real context in the language of the user (1 to 4 groups, 2 to 6 options each, no numbering); otherwise questions is null. Set "infrastructure" true ONLY when a REAL FAILURE LOG is attached above and shows no project-code error; otherwise it is always false.\n\nReturn ONLY one JSON object: {"intent":"","analysis":{"root_cause":"","failed_task":"","failed_step":"","error_type":"","error_file":"","error_line":null,"relevant_dependency":null,"recommended_fix":""},"infrastructure":false,"summary":"one short line","answer":"reply text when no file change is needed, else empty","questions":null,"files":[{"path":"relative/path","action":"modify|create|delete","reason":"short","refs":[]}]}. For a code change or bug fix list only the files that must change (minimal set)."';const hist=p.agent.filter(m=>m!==am&&m.status==='done'&&m.content).slice(0,-1).slice(-6).map(m=>({role:m.role,content:m.content}));let raw='';const tP=Date.now();await providerChat({provider:activeProvider(),messages:[{role:'system',content:AG_SYS},...hist,{role:'user',content:up}],signal:S.agentAbort.signal,reasoning:'fast',onDelta:d=>{raw+=d;const pa=partialAnswer(raw);if(pa&&pa!==am.content){am.content=pa;updateLive(am,'#agentMsgs');}},onReasoning:think(am)});let plan;try{plan=JSON.parse((raw.match(/\{[\s\S]*\}/)||[''])[0])}catch(_){plan=null}if(!plan||typeof plan!=='object'){if(!am.fromBuild&&!am.errText&&raw.trim())plan={intent:'chat',answer:raw.trim(),files:[]};else throw new Error('The model did not return a valid plan. Try again.');}const seen=new Set();am.queue=(plan.files||[]).map(f=>({path:normPath(f&&f.path),action:String(f&&f.action||'modify').toLowerCase(),reason:String(f&&f.reason||''),refs:((f&&f.refs)||[]).map(normPath).filter(r=>p.files[r]).slice(0,2)})).filter(f=>f.path&&!isUnsafe(f.path)&&!seen.has(f.path)&&seen.add(f.path)).slice(0,12).map(f=>{if(f.action!=='delete')f.action=p.files[f.path]?'modify':'create';f.status='queued';return f});am.plan=String(plan.summary||'');const an=plan.analysis||{};if(an.root_cause&&(am.fromBuild||am.errText))agAct(am,'Root cause: '+String(an.root_cause).slice(0,300)+(an.error_file?' ('+an.error_file+(an.error_line?':'+an.error_line:'')+')':''),'search');const intent=String(plan.intent||'').toLowerCase().replace(/[^a-z_]/g,''),talk=/^(greeting|chat|question|project_question|explain|inspect|clarify|identity)$/.test(intent);if(talk)am.queue=[];
 if(am.fromBuild&&plan.infrastructure===true&&!am.queue.length){am.content='No project-code error was found in the build log. The failure appears to be infrastructure/build-service related.'+(an.root_cause?'\n\n'+an.root_cause:'')+'\nNo project files were changed.';agEnd(am,evU,'done','Build log analysed \u2014 no project-code error found');am.status='done';return;}
 agEnd(am,evU,'done',intent?'Request understood ('+intent.replace(/_/g,' ')+')':'Request understood',{detail:'Planner responded in '+((Date.now()-tP)/1000).toFixed(1)+'s'});
 if(!am.queue.length){let ans=String(plan.answer||'').trim();if(!ans&&!am.fromBuild&&!(plan.questions&&plan.questions.groups))ans=await agentChatReply(am,hist,text);if(!ans)ans=am.plan||'I could not find a change to make. Could you describe what you want changed?';am.content=ans+qBlock(plan.questions);agAct(am,am.fromBuild?'No file changes were needed':'Replied \u2014 no file operations were needed','info');await typerDrain(am,'#agentMsgs',S.agentAbort.signal);am.status='done';return;}
@@ -5935,5 +5962,31 @@ window.__codingAgent={execTool,parseCall,visible,build,changedList,snapBase,chkJ
 .mtop-pj.logo-only .mlogo{width:22px;height:22px}
 .mtop-pj.logo-only .ic.mfb{width:22px;height:22px}
 </style>
+
+<style id="wm-ui">
+/* New (work mode) button next to Web access */
+.wm-btn{height:36px;padding:0 8px 0 10px;border-radius:12px;display:inline-flex;align-items:center;gap:3px;font-size:12.5px;font-weight:600;color:#94A3B8;background:rgba(255,255,255,0.03);flex:none;white-space:nowrap;transition:background .12s,color .12s}
+.wm-btn:hover{background:rgba(255,255,255,0.08);color:#fff}
+.wm-btn:active{transform:scale(.96)}
+.wm-btn .ic{width:13px;height:13px}
+/* brain icon only (reasoning effort) */
+.cbtn.brain-btn span{display:none}
+.cbtn.dis{opacity:.45}
+/* model select inside composer (Project Agent tab) */
+.pjmodel{height:36px;max-width:112px;min-width:0;padding:0 8px;border-radius:12px;display:inline-flex;align-items:center;gap:4px;font-size:12.5px;font-weight:600;color:#94A3B8;background:rgba(255,255,255,0.03);flex:0 1 auto;overflow:hidden}
+.pjmodel span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pjmodel .ic{width:13px;height:13px;flex:none}
+.pjmodel .mlogo{width:18px;height:18px;flex:none}
+.pjmodel:hover{background:rgba(255,255,255,0.08);color:#fff}
+/* popup */
+.wm-pop{position:fixed;z-index:200;background:var(--surface);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow);padding:6px;display:flex;flex-direction:column;gap:2px}
+.wm-opt{display:flex;align-items:center;gap:8px;padding:10px;border-radius:12px;text-align:left;width:100%}
+.wm-opt:hover{background:rgba(255,255,255,0.06)}
+.wm-tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.wm-tx b{font-size:14.5px;font-weight:600;color:var(--text)}
+.wm-tx small{font-size:12px;color:var(--text2)}
+.wm-opt.on .wm-tx b{color:var(--accent)}
+.wm-ck{width:18px;text-align:center;color:var(--accent);font-weight:700}
+</style>
 </body>
-</html
+</html>
