@@ -823,6 +823,7 @@ body.auth-open #toasts{z-index:6000}
 <symbol id="i-box" viewBox="0 0 24 24"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5M12 22V12"/></symbol>
 <symbol id="i-back" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></symbol>
 <symbol id="i-wk-grid" viewBox="0 0 24 24"><circle cx="7" cy="7" r="3.3"/><circle cx="17" cy="7" r="3.3"/><circle cx="7" cy="17" r="3.3"/><circle cx="17" cy="17" r="3.3"/></symbol>
+<symbol id="i-terminal" viewBox="0 0 24 24"><path d="m4 6 6 6-6 6"/><path d="M12 18h8"/></symbol>
 <symbol id="i-wk-bubble" viewBox="0 0 24 24"><path d="M12.00 5.50A3.3 3.3 0 0 1 17.08 7.95A3.3 3.3 0 0 1 18.34 13.45A3.3 3.3 0 0 1 14.82 17.86A3.3 3.3 0 0 1 9.18 17.86A3.3 3.3 0 0 1 5.66 13.45A3.3 3.3 0 0 1 6.92 7.95A3.3 3.3 0 0 1 12.00 5.50Z" fill="url(#wkTG)" stroke="url(#wkTS)" stroke-width="1.1" stroke-linejoin="round"/><path d="M12.00 5.50A3.3 3.3 0 0 1 17.08 7.95A3.3 3.3 0 0 1 18.34 13.45A3.3 3.3 0 0 1 14.82 17.86A3.3 3.3 0 0 1 9.18 17.86A3.3 3.3 0 0 1 5.66 13.45A3.3 3.3 0 0 1 6.92 7.95A3.3 3.3 0 0 1 12.00 5.50Z" fill="url(#wkTH)" stroke="none"/><path d="m9 10.3 2.5 1.9L9 14.1" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 14.5h2.7" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/></symbol>
 <symbol id="i-wk-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></symbol>
 <symbol id="i-wk-check" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m8 12.5 2.8 2.8L16 9.5"/></symbol>
@@ -2292,7 +2293,7 @@ const clEvs=m=>m.activity||[];
 function clItem(x){
  if(x.kind==='say')return '<div class="cl-it say"><div class="cl-bar"><span class="cl-dot"></span><span class="cl-vl"></span></div><div class="cl-body"><div class="cl-sd">'+esc(String(x.text||x.label).replace(/`/g,''))+'</div></div></div>';
  const sub=[x.path,x.status==='fail'?x.detail:''].filter(Boolean).join('\n');
- return '<div class="cl-it tool'+(x.status==='fail'?' bad':'')+(x.status==='run'?' live':'')+'" data-evid="'+x.id+'"><div class="cl-bar"><span class="cl-box">'+icon(x.status==='fail'?'alert':'wk-bubble','sm')+'</span><span class="cl-vl"></span></div><div class="cl-body"><div class="cl-st">'+esc(x.label)+'</div>'+(sub?'<div class="cl-sub">'+esc(sub)+'</div>':'')+'</div></div>';}
+ return '<div class="cl-it tool'+(x.status==='fail'?' bad':'')+(x.status==='run'?' live':'')+'" data-evid="'+x.id+'"><div class="cl-bar"><span class="cl-box">'+icon(x.status==='fail'?'alert':(x.icon||'wk-bubble'),'sm')+'</span><span class="cl-vl"></span></div><div class="cl-body"><div class="cl-st">'+esc(x.label)+'</div>'+(sub?'<div class="cl-sub">'+esc(sub)+'</div>':'')+'</div></div>';}
 function clDetail(ev){
  const rq=ev.req||ev.path||'',rs=ev.res||ev.detail||'';
  return (rq?'<div class="cl-dh">Request</div><pre class="cl-pre">'+esc(rq)+'</pre>':'')+(rs?'<div class="cl-dh">Response</div><pre class="cl-pre">'+esc(rs)+'</pre>':'')+(!rq&&!rs?'<div class="cl-sd" style="margin-top:18px">No details were stored for this step.</div>':'');}
@@ -2423,7 +2424,7 @@ function actSt(st){return st==='same'?icon('ok','sm muted'):st==='run'?'<span cl
 function actTime(ts){if(!ts)return '';try{return new Date(ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});}catch(_){return '';}}
 function clRow(g){
  const run=g.find(x=>x.status==='run'),fails=g.some(x=>x.status==='fail'),title=run?run.label:g[0].label;
- return '<div class="cl-row'+(run?' live':'')+(fails?' bad':'')+'" data-clev="'+g[0].id+'" data-cln="'+g.length+'">'+(run?'<span class="cl-dots"><i></i><i></i><i></i></span>':icon(fails?'alert':'wk-bubble','sm'))+'<span class="cl-t">'+esc(title)+'</span>'+(g.length>1?'<span class="cl-n">+'+(g.length-1)+'</span>':'')+icon('chev-r','sm cl-chev')+'</div>';}
+ return '<div class="cl-row'+(run?' live':'')+(fails?' bad':'')+'" data-clev="'+g[0].id+'" data-cln="'+g.length+'">'+(run?'<span class="cl-dots"><i></i><i></i><i></i></span>':icon(fails?'alert':(g[0].icon||'wk-bubble'),'sm'))+'<span class="cl-t">'+esc(title)+'</span>'+(g.length>1?'<span class="cl-n">+'+(g.length-1)+'</span>':'')+icon('chev-r','sm cl-chev')+'</div>';}
 function activityCard(m){if(!m.activity||!m.activity.length)return '';
  const out=[];let g=null;const flush=()=>{if(g){out.push(clRow(g));g=null;}};
  m.activity.forEach(x=>{x.new=false;
@@ -5643,7 +5644,7 @@ async function shCmd(run,a,sig,stdin){
  return{code:127,err:'bash: '+c+': command not found. Network access and package installation are unavailable in this app. Type help for supported commands.'};
 }
 async function tShell(run,a,sig){
- const cmd=String(a.command||'');if(!cmd.trim())return E('run_command requires command');if(/\\$\\(|\`|<<|(^|\\s)(sudo|for|while|function)\\b|(^|\\s)&(\\s|$)/.test(cmd))return E('Unsupported shell syntax (variables, command substitution, backticks, heredocs, loops, functions and background jobs are unavailable).');if(cmd.length>4000)return E('command exceeds 4000 characters');
+ const cmd=String(a.command||'');if(!cmd.trim())return E('run_command requires command');if(cmd.includes('$(')||cmd.includes('`')||cmd.includes('<<')||/(^|\s)(sudo|for|while|function)\b|(^|\s)&(\s|$)/.test(cmd))return E('Unsupported shell syntax (variables, command substitution, backticks, heredocs, loops, functions and background jobs are unavailable).');if(cmd.length>4000)return E('command exceeds 4000 characters');
  let tok;try{tok=shLex(cmd);}catch(e){return E(e.message);}
  const groups=[];let cur=[],sep=';';for(const x of tok){if([';','&&','||','|'].includes(x)){groups.push({a:cur,op:x});cur=[];}else cur.push(x);}if(cur.length)groups.push({a:cur,op:''});
  if(groups.length>12)return E('At most 12 commands per call');
