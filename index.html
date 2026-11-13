@@ -5158,7 +5158,7 @@ First classify the request. This is the same for pasted code, an uploaded file, 
 - MULTI: two or more tasks, for example "update the design, fix the button, add a feature, delete a text" is four tasks.
 - BUILD: a new website or app from nothing.
 
-Call budgets (targets, not hard limits): TINY about 6 to 8 calls in total (search, read, edit, check_syntax, diff, export). MULTI about 4 calls per task plus 4 for verification and export. BUILD one create_file per file, then check_syntax and diff per file, one or two wiring searches, one export. If you are far over budget, you are re-reading, repeating searches, or deliberating: stop and act.
+Call budgets (targets, not hard limits): TINY about 5 to 7 calls. MULTI about 4 calls per task plus 3 for verification and export. BUILD: one look, one architecture message, one create_file per file, one chained verification, one delivery. Prefer chained run_command calls for look, locate and verification. If you are far over budget, you are re-reading, repeating searches, or deliberating: stop and act.
 
 1. UNDERSTAND - Split the message into tasks. With two or more tasks, write a numbered checklist (one short line each) as the text of your first message, in the same message as your first tool call. With one task, no checklist. Resolve vague words with these defaults instead of asking:
    - "update the design" with no target = improve the look of the whole visible UI, in a way the user can clearly see (section 8, NEW DESIGN), not one tiny tweak.
@@ -5192,7 +5192,7 @@ Call budgets (targets, not hard limits): TINY about 6 to 8 calls in total (searc
 
 ## 7. VERIFICATION (before every final report)
 
-1. check_syntax once on every changed or created file, after its last edit.
+1. check_syntax once on every changed or created file, after its last edit. Checks may run through run_command (node --check, check, diff, grep -c), but every changed file still needs a syntax check and diff after its last edit.
 2. diff once on every changed file, after check_syntax. For modified files read it: every hunk must trace to a requested task, revert anything else. For brand-new files the diff is all additions: call it (the app requires it) but do not re-read it.
 3. Reference integrity, with as few searches as possible (one regex search such as "oldName|oldId", regex true):
    - A deleted or renamed ID, class, function, variable, or string has no remaining references.
@@ -5296,7 +5296,7 @@ This is where quality and speed are won or lost. Follow it exactly.
         1. <task> - <file> > <function, section, or lines>: <what changed>
         2. ...
         Assumptions: <only if any>
-        Verified: syntax OK for <files>; diff reviewed; references checked
+        Ran: <key commands and actual results, e.g. node --check app.js OK>\n        Verified: list only what a command really returned; diff reviewed; references checked
         Not verified: real runtime behavior and visual appearance (I cannot run the app)
         Noticed, not changed: <only if any>
         Output: <exported file or zip name>
@@ -5319,6 +5319,8 @@ If the app tells you that native tool calling is unavailable, call tools with th
 
         TOOL_CALL: {"tool": "read_file", "args": {"path": "index.html", "from": 840, "to": 930}}
 
+        TOOL_CALL: {"tool": "run_command", "args": {"command": "cd /mnt/user-data/uploads; wc -c index.html; head -c 2500 index.html"}}
+
 - One call per message. The JSON must be valid, use double quotes, and nothing may follow it.
 - The app answers with a message that starts with TOOL_RESULT: followed by the tool output. Continue from there.
 - When you are finished, write your final report as plain text with no TOOL_CALL line.`;
@@ -5328,6 +5330,7 @@ const CA_B=`## APPENDIX B - EXAMPLES OF GOOD RUNS (shape only; do not copy the s
         User: In index.html the Send button does nothing. Also remove the word Beta from the header.
 
         Agent: Two tasks: 1. Fix Send button  2. Delete "Beta" from header
+        First call: TOOL_CALL run_command({command: "cd /mnt/user-data/uploads; wc -c index.html; head -c 2500 index.html"})
         search("Beta|badge|sendBtn|send-btn", regex)  -> 412 span.badge; 88 .badge rule; 6131 getElementById("sendBtn"); 530 id="send-btn"
         read_file("index.html", 405, 420)
         edit_file: remove the span (line 412)
@@ -5340,7 +5343,8 @@ const CA_B=`## APPENDIX B - EXAMPLES OF GOOD RUNS (shape only; do not copy the s
 
         EXAMPLE 2 - BUILD, new app
         User: Make a habit tracker app.
-        Agent (one message): Plan: index.html (ids: habitList, addForm, habitInput, stats), styles.css (tokens --bg --surface --accent --radius), app.js (state, render(), addHabit(), toggleHabit()). Assumed: mobile-first, saved with localStorage.
+        Agent first call: TOOL_CALL run_command({command: "cd /mnt/user-data/uploads; wc -c index.html; head -c 2500 index.html"})
+        Agent after inspection: Plan: index.html (ids: habitList, addForm, habitInput, stats), styles.css (tokens --bg --surface --accent --radius), app.js (state, render(), addHabit(), toggleHabit()). Assumed: mobile-first, saved with localStorage.
         create_file index.html -> OK
         create_file styles.css -> OK
         create_file app.js -> OK
@@ -5867,14 +5871,14 @@ function systemPrompt(mode,p){
  s+='\n\n## APP NOTES (this app)\n'+
   '- Native tool calling is NOT available here: always use the text protocol of Appendix A. Never write TOOL_RESULT yourself. Never use XML or DSML tags for tool calls; only TOOL_CALL lines.\n'+
   '- Your output limit per message is about '+mt+' tokens (roughly '+Math.floor(mt*3)+' characters). Keep the content of every create_file or edit_file call under about two thirds of that character figure. For a larger build, split it across several files (section 8); never write a skeleton and patch it with many edits.\n'+
-  '- export(mode, path): the app shows the user download buttons. Call it once, at the end, after verification.\n'+
+  '- export(mode, path): the app shows the user download buttons. Call it once, at the end, after verification.\n  '- run_command is available. Prefer one chained call over many small ones.\n'+'+
   '- run_command is available. Prefer one chained call over many small ones.\n'+
   '- Plain conversation (greetings, questions, explanations) needs no tools: just answer directly.\n';
  if(mode==='project')s+='- The workspace is the Code tab of the project "'+p.name+'" ('+(TECHS[p.tech]?TECHS[p.tech].title:'imported project')+', package '+(p.package||'n/a')+'). Edits are saved to the project immediately and the user can revert a whole run. Paths are relative to the project root. Do not touch build output, lockfiles or dependency folders.\n';
  return s+'\n'+THINK_RULE+'\n'+PROMPT_RULE+'\n'+LINKS_RULE+modeRule();}
 function modeRule(){const m=S.agentMode;
  if(m==='plan')return '\n\n## MODE: PLAN (chosen by the user in the composer)\nWhen the user asks you to create, build, change, fix or delete something, you must write a plan BEFORE you touch anything. Write it as plain text at the start of your reply, under a first line that says only: Plan. Then 3 to 7 short numbered steps: what you will do, and which files you will create or change. Right after the plan, in that same reply, send your first TOOL_CALL and then carry out the whole plan step by step. Do NOT stop after the plan and do NOT ask the user to approve it. Write the plan once only; do not repeat it later. In your final report, say briefly which plan steps are done. For greetings, questions and explanations that change nothing, just answer normally with no plan.';
- if(m==='build')return '\n\n## MODE: BUILD (chosen by the user in the composer)\nWhen the user asks you to create, build, change, fix or delete something, build it directly. Do not write a plan, an outline or an introduction first, and do not ask questions unless the request is impossible to carry out without the answer (then make the most reasonable assumption and say so in one line at the end). Your first reply should already be a TOOL_CALL. Keep your final report short. For greetings, questions and explanations that change nothing, just answer normally.';
+ if(m==='build')return '\n\n## MODE: BUILD (chosen by the user in the composer)\nWhen the user asks you to create, build, change, fix or delete something, build it directly. Do not write a plan, an outline or an introduction first, and do not ask questions unless the request is impossible to carry out without the answer (then make the most reasonable assumption and say so in one line at the end). Your first reply should already be a TOOL_CALL. A chained run_command look counts as the first TOOL_CALL. Keep your final report short. For greetings, questions and explanations that change nothing, just answer normally.';
  return '';}
 function pushHist(out,role,text,parts){
  if(!out.length&&role!=='user')return;const last=out[out.length-1];
