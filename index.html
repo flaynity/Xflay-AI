@@ -2083,7 +2083,17 @@ async function geminiStudioChat(o){
  const msgs=Array.isArray(o.messages)?o.messages:[],contents=[],systemParts=[];
  msgs.forEach(m=>{const role=m.role==='assistant'?'model':m.role==='system'?'system':'user',txt=typeof m.content==='string'?m.content:Array.isArray(m.content)?m.content.map(x=>typeof x==='string'?x:(x.text||'')).join(' '):String(m.content||'');if(!txt)return;if(role==='system'){systemParts.push({text:txt});return;}const last=contents[contents.length-1];if(last&&last.role===role)last.parts.push({text:txt});else contents.push({role,parts:[{text:txt}]});});
  if(!contents.length)throw new Error('No text message was provided.');
- const body={contents,generationConfig:{temperature:o.temperature??p.temperature??0.7,maxOutputTokens:o.maxTokens??p.maxTokens??4096}};
+ const model=o.model||p.model,reasoning=o.reasoning||S.settings.reasoning||'balanced';
+ const generationConfig={temperature:o.temperature??p.temperature??0.7,maxOutputTokens:o.maxTokens??p.maxTokens??4096};
+ const isGemini25=/gemini-2\\.5-/i.test(model),isThinkingModel=isGemini25||/gemini-(?:[3-9])\\./i.test(model);
+ const thinkBudget={fast:1024,balanced:4096,deep:8192,extra:16384,max:24576}[reasoning]||4096;
+ if(isThinkingModel&&reasoning!=='off'){
+  generationConfig.thinkingConfig={includeThoughts:true};
+  if(isGemini25)generationConfig.thinkingConfig.thinkingBudget=thinkBudget;
+  else generationConfig.thinkingConfig.thinkingLevel=({fast:'low',balanced:'medium',deep:'high',extra:'high',max:'high'}[reasoning]||'medium');
+  if(isGemini25)generationConfig.maxOutputTokens=Math.max(generationConfig.maxOutputTokens,thinkBudget+1024);
+ }
+ const body={contents,generationConfig};
  if(systemParts.length)body.systemInstruction={parts:systemParts};
  const stream=!!(o.stream??p.stream),url='https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(o.model||p.model)+(stream?':streamGenerateContent?alt=sse':':generateContent');
  const ac=new AbortController();let timedOut=false;const timeout=setTimeout(()=>{timedOut=true;ac.abort();},o.waitMs||180000);
@@ -2091,14 +2101,18 @@ async function geminiStudioChat(o){
  let res;try{res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':p.apiKey},body:JSON.stringify(body),signal:ac.signal});}
  catch(e){clearTimeout(timeout);if(timedOut)throw new Error('Google AI Studio request timed out.');if(e.name==='AbortError')throw e;throw new Error('Google AI Studio network error: '+(e.message||'request failed'));}
  if(!res.ok){clearTimeout(timeout);let t='';try{t=await res.text();}catch(_){}throw new Error('Google AI Studio HTTP '+res.status+': '+(t.replace(/\s+/g,' ').slice(0,300)||'Request failed. Check API key, model access and quota.'));}
- const getText=j=>((j.candidates||[])[0]&&((j.candidates[0].content||{}).parts||[]).map(x=>x.text||'').join(''))||'';
- if(!stream){try{const j=await res.json(),c=getText(j);if(!c)throw new Error('Google returned no text. The model may have blocked the prompt.');if(o.onDelta)o.onDelta(c);return c;}finally{clearTimeout(timeout);}}
+ const getParts=j=>((j.candidates||[])[0]&&((j.candidates[0].content||{}).parts||[]))||[];
+ const deliver=j=>{let answer='';getParts(j).forEach(part=>{if(!part||typeof part.text!=='string')return;if(part.thought){if(o.onReasoning)o.onReasoning(part.text);}else{answer+=part.text;if(o.onDelta)o.onDelta(part.text);}});return answer;};
+ if(!stream){try{const j=await res.json(),c=deliver(j);if(!c)throw new Error('Google returned no answer text. The model may have blocked the prompt.');return c;}finally{clearTimeout(timeout);}}
  if(!res.body){clearTimeout(timeout);throw new Error('Streaming response is unavailable.');}
  const reader=res.body.getReader(),decoder=new TextDecoder();let buffer='',full='';
- try{while(true){const part=await reader.read();if(part.done)break;buffer+=decoder.decode(part.value,{stream:true});let i;while((i=buffer.indexOf('\n'))>=0){const line=buffer.slice(0,i).trim();buffer=buffer.slice(i+1);if(!line.startsWith('data:'))continue;const raw=line.slice(5).trim();if(!raw)continue;let j;try{j=JSON.parse(raw);}catch(_){continue;}const c=getText(j);if(c){full+=c;if(o.onDelta)o.onDelta(c);}}}
-  if(buffer.trim().startsWith('data:')){try{const j=JSON.parse(buffer.trim().slice(5));const c=getText(j);if(c){full+=c;if(o.onDelta)o.onDelta(c);}}catch(_){}}
+ const processLine=line=>{line=line.trim();if(!line.startsWith('data:'))return;const raw=line.slice(5).trim();if(!raw||raw==='[DONE]')return;try{full+=deliver(JSON.parse(raw));}catch(_){}};
+ try{while(true){const part=await reader.read();if(part.done)break;buffer+=decoder.decode(part.value,{stream:true});let i;while((i=buffer.indexOf('\\n'))>=0){processLine(buffer.slice(0,i));buffer=buffer.slice(i+1);}}
+  if(buffer.trim())processLine(buffer);
+  if(!full.trim())throw new Error('Google returned no answer text. The model may have blocked the prompt.');
   return full;
  }finally{clearTimeout(timeout);try{reader.releaseLock();}catch(_){}}
+
 }
 async function providerChat(o){const p=o.provider;if(!p)throw new Error('No AI provider is configured. Open Menu > Set Up AI.');if(p.providerType==='google-ai-studio')return geminiStudioChat(o);
  const headers={'Content-Type':'application/json'};if(p.apiKey)headers.Authorization='Bearer '+p.apiKey;
@@ -2936,7 +2950,7 @@ function qClick(e){
 document.addEventListener('click',e=>{qClick(e);abClick(e);});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeSrcSheet();});
 
-function fastThink(){const r=S.settings.reasoning;return (r==='off'||r==='deep'||r==='extra'||r==='max')?r:'fast';}
+function fastThink(){return S.settings.reasoning||'balanced';}
 const CODE_RULES=`
 CODE EDITING RULES (apply to every create/update/fix/redesign/delete request; identical in Chat and Agent):
 1. SOURCE OF TRUTH: edit the latest version of the file/project the user means (selected project file, uploaded file/zip, or your latest generated file shown in GENERATED FILES). Never replace existing work with a fresh approximation. If versions or names are ambiguous, ask ONE short question; otherwise take the least destructive interpretation. Never claim you read, ran or tested something you did not.
@@ -3331,7 +3345,7 @@ function renderProviders(){const list=$('#pvList');
   </div></div>`).join(''):'<div class="note">'+icon('info','sm')+'<span>No providers yet. Add an OpenAI-compatible provider (Base URL, key, model).</span></div>');}
 $('#gasKeyToggle').onclick=()=>{const k=$('#gasKey'),show=k.type==='password';k.type=show?'text':'password';$('#gasKeyToggle').innerHTML=icon(show?'x':'eye');};
 $('#gasLoad').onclick=async()=>{const key=$('#gasKey').value.trim(),status=$('#gasStatus'),load=$('#gasLoad');if(!key){status.textContent='Paste your Google AI Studio API key first.';return;}load.disabled=true;load.textContent='Loading models…';status.textContent='Checking the API key and loading models from Google…';try{const p={providerType:'google-ai-studio',apiKey:key};const models=await fetchModels(p);if(!models.length)throw new Error('No models with generateContent support were returned for this key.');const preferred=models.find(m=>/flash/i.test(m))||models[0];$('#gasModel').innerHTML=models.map(m=>'<option value="'+esc(m)+'">'+esc(m)+'</option>').join('');$('#gasModel').value=preferred;$('#gasModelWrap').classList.remove('hidden');$('#gasSave').classList.remove('hidden');status.textContent=models.length+' compatible models found. Select a model, then save and connect. Model access and free quota depend on your Google project.';$('#gasSave').dataset.key=key;}catch(e){status.textContent=e.message||'Could not connect to Google AI Studio.';$('#gasModelWrap').classList.add('hidden');$('#gasSave').classList.add('hidden');}finally{load.disabled=false;load.textContent='Load available models';}};
-$('#gasSave').onclick=()=>{const key=$('#gasSave').dataset.key||$('#gasKey').value.trim(),model=$('#gasModel').value;if(!key||!model)return;let p=S.settings.providers.find(x=>x.providerType==='google-ai-studio');if(p){p.apiKey=key;p.model=model;p.name='Google AI Studio';p.baseUrl='https://generativelanguage.googleapis.com/v1beta';p.stream=true;p.vision=false;p.lastTest=true;}else{p={id:uid(),name:'Google AI Studio',providerType:'google-ai-studio',baseUrl:'https://generativelanguage.googleapis.com/v1beta',apiKey:key,model,temperature:0.7,maxTokens:4096,stream:true,supportsReasoning:false,vision:false,lastTest:true};S.settings.providers.push(p);}try{localStorage.setItem('xflay.google-ai-studio.key',key);}catch(e){toast('Could not save the API key on this device. Check browser storage.','err');return;}S.settings.selectedProviderId=p.id;saveSettings();renderProviders();updateChips();renderChat();$('#gasStatus').textContent='Connected on this device. Your Google AI Studio key is not synced to Firebase.';toast('Google AI Studio connected.','ok');};
+$('#gasSave').onclick=()=>{const key=$('#gasSave').dataset.key||$('#gasKey').value.trim(),model=$('#gasModel').value;if(!key||!model)return;let p=S.settings.providers.find(x=>x.providerType==='google-ai-studio');if(p){p.apiKey=key;p.model=model;p.name='Google AI Studio';p.baseUrl='https://generativelanguage.googleapis.com/v1beta';p.stream=true;p.supportsReasoning=true;p.vision=false;p.lastTest=true;}else{p={id:uid(),name:'Google AI Studio',providerType:'google-ai-studio',baseUrl:'https://generativelanguage.googleapis.com/v1beta',apiKey:key,model,temperature:0.7,maxTokens:4096,stream:true,supportsReasoning:true,vision:false,lastTest:true};S.settings.providers.push(p);}try{localStorage.setItem('xflay.google-ai-studio.key',key);}catch(e){toast('Could not save the API key on this device. Check browser storage.','err');return;}S.settings.selectedProviderId=p.id;saveSettings();renderProviders();updateChips();renderChat();$('#gasStatus').textContent='Connected on this device. Your Google AI Studio key is not synced to Firebase.';toast('Google AI Studio connected.','ok');};
 $('#pvList').addEventListener('click',e=>{const u=e.target.closest('[data-puse]');if(u){S.settings.selectedProviderId=u.dataset.puse;saveSettings();renderProviders();updateChips();renderChat();return;}
  const ed=e.target.closest('[data-pedit]');if(ed){openProviderForm(S.settings.providers.find(p=>p.id===ed.dataset.pedit));return;}
  const t=e.target.closest('[data-ptest]');if(t){openTestModal(S.settings.providers.find(p=>p.id===t.dataset.ptest));return;}
