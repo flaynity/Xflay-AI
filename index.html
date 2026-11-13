@@ -2085,7 +2085,7 @@ async function geminiStudioChat(o){
  if(!contents.length)throw new Error('No text message was provided.');
  const model=o.model||p.model,reasoning=o.reasoning||S.settings.reasoning||'balanced';
  const generationConfig={temperature:o.temperature??p.temperature??0.7,maxOutputTokens:o.maxTokens??p.maxTokens??4096};
- const isGemini25=/gemini-2\\.5-/i.test(model),isThinkingModel=isGemini25||/gemini-(?:[3-9])\\./i.test(model);
+ const isGemini25=/gemini-2\.5-/i.test(model),isThinkingModel=isGemini25||/gemini-(?:[3-9])\./i.test(model);
  const thinkBudget={fast:1024,balanced:4096,deep:8192,extra:16384,max:24576}[reasoning]||4096;
  if(isThinkingModel&&reasoning!=='off'){
   generationConfig.thinkingConfig={includeThoughts:true};
