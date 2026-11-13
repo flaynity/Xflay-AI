@@ -5642,8 +5642,27 @@ async function shCmd(run,a,sig,stdin){
  }
  return{code:127,err:'bash: '+c+': command not found. Network access and package installation are unavailable in this app. Type help for supported commands.'};
 }
-async function tShell(run,a,sig){const cmd=String(a.command||'');if(!cmd.trim())return E('run_command requires command');if(cmd.length>4000)return E('command exceeds 4000 characters');let tok;try{tok=shLex(cmd);}catch(e){return E(e.message);}const groups=[];let cur=[],op=';';for(const x of tok){if([';','&&','||','|'].includes(x)){groups.push({a:cur,op});cur=[];op=x;}else cur.push(x);}if(cur.length)groups.push({a:cur,op});if(groups.length>12)return E('At most 12 commands per call');let out='',code=0,pipe='';for(const g of groups){if(g.op==='&&'&&code!==0)continue;if(g.op==='||'&&code===0)continue;const args=g.a.slice(),ri=args.findIndex(x=>x==='>'||x==='>>');let target='',append=false;if(ri>=0){target=args[ri+1];append=args[ri]==='>>';args.splice(ri,2);const l=shLoc(run,target);if(!l||l.root!=='work')return E('redirects may write only inside /home/agent');}const r=await shCmd(run,args,sig,g.op==='|'?pipe:undefined);code=r.code||0;pipe=(r.out||'')+(r.err?(r.out?'\n':'')+r.err:'');if(target){const l=shLoc(run,target);run.files[l.path]={content:(append&&run.files[l.path]?run.files[l.path].content:'')+pipe};pipe='';}if(sig&&sig.aborted)throw new DOMException('Aborted','AbortError');if(g.op!=='|'){out+=(out?'\n':'')+pipe;pipe='';}}if(pipe)out+=(out?'\n':'')+pipe;if(out.length>40000)out=out.slice(0,40000)+'\n[output truncated - narrow it with head, tail, grep or sed -n]';return R((out?out+'\n':'')+'[exit '+code+' | cwd '+(run.cwd||'/home/agent')+']','Running command','terminal',code===0,'$ '+cmd);}
-
+async function tShell(run,a,sig){
+ const cmd=String(a.command||'');if(!cmd.trim())return E('run_command requires command');if(/\\$\\(|\`|<<|(^|\\s)(sudo|for|while|function)\\b|(^|\\s)&(\\s|$)/.test(cmd))return E('Unsupported shell syntax (variables, command substitution, backticks, heredocs, loops, functions and background jobs are unavailable).');if(cmd.length>4000)return E('command exceeds 4000 characters');
+ let tok;try{tok=shLex(cmd);}catch(e){return E(e.message);}
+ const groups=[];let cur=[],sep=';';for(const x of tok){if([';','&&','||','|'].includes(x)){groups.push({a:cur,op:x});cur=[];}else cur.push(x);}if(cur.length)groups.push({a:cur,op:''});
+ if(groups.length>12)return E('At most 12 commands per call');
+ let out='',code=0,pipe='';const before=JSON.stringify(run.files);
+ for(let i=0;i<groups.length;i++){
+  const g=groups[i],prev=i?groups[i-1].op:';';
+  if(prev==='&&'&&code!==0)continue;if(prev==='||'&&code===0)continue;
+  const args=g.a.slice(),ri=args.findIndex(x=>x==='>'||x==='>>');let target='',append=false;
+  if(ri>=0){target=args[ri+1];append=args[ri]==='>>';args.splice(ri,2);const l=shLoc(run,target);if(!l||l.root!=='work')return E('redirects may write only inside /home/agent');}
+  const input=prev==='|'?pipe:undefined,r=await shCmd(run,args.filter(x=>x!=='2>&1'),sig,input);code=r.code||0;
+  pipe=(r.out||'')+(r.err?(r.out?'\n':'')+r.err:'');
+  if(target){const l=shLoc(run,target);run.files[l.path]={content:(append&&run.files[l.path]?run.files[l.path].content:'')+pipe};pipe='';}
+  if(sig&&sig.aborted)throw new DOMException('Aborted','AbortError');
+  if(g.op!=='|'){out+=(out?'\n':'')+pipe;pipe='';}
+ }
+ if(pipe)out+=(out?'\n':'')+pipe;
+ if(out.length>40000)out=out.slice(0,40000)+'\n[output truncated - narrow it with head, tail, grep or sed -n]';
+ return R((out?out+'\n':'')+'[exit '+code+' | cwd '+(run.cwd||'/home/agent')+']','Running command','terminal',code===0,'$ '+cmd,JSON.stringify(run.files)!==before);
+}
 async function execTool(run,call,signal){
  const a=call.args||{};
  try{switch(String(call.tool)){
