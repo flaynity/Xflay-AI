@@ -405,6 +405,10 @@ input,textarea,select{font:inherit;color:inherit}
 
 /* providers and lists */
 .pwrap{padding:16px 14px calc(24px + env(safe-area-inset-bottom));max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+#gasCard .ph{display:flex;align-items:center;gap:9px}#gasCard .ph .pbadge{margin-left:auto}
+#gasCard .field label{display:block;font-size:12.5px;font-weight:600;color:var(--text2);margin-bottom:7px}
+#gasCard .keybox{display:flex;gap:8px;align-items:center}#gasCard .keybox .inp{min-width:0;flex:1}
+#gasCard #gasStatus{line-height:1.5;overflow-wrap:anywhere}
 .pcard{border:1px solid var(--border);border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:10px;background:var(--surface)}
 .pcard.active{border-color:var(--accent);box-shadow:0 0 20px rgba(255,27,122,0.15)}
 .pcard .ph{display:flex;align-items:center;gap:10px}
@@ -935,7 +939,16 @@ body.auth-open #toasts{z-index:6000}
   </header>
   <div class="scrollpane"><div class="pwrap">
     <div id="pvList"></div>
-    <div class="note"><svg class="ic sm"><use href="#i-key"/></svg><span>API keys are stored strictly in this browser and sent only to your configured provider URL.</span></div>
+    <div class="pcard" id="gasCard">
+      <div class="ph"><svg class="ic"><use href="#l-gemini"/></svg><b>Google AI Studio</b><span class="pbadge">Gemini API</span></div>
+      <div class="pmeta">Connect your own Google AI Studio API key and load the models available to that key. Google account OAuth alone does not grant access to the AI Studio Free Tier API.</div>
+      <div class="field" style="margin:0"><label for="gasKey">Gemini API key</label><div class="keybox"><input class="inp lead" id="gasKey" type="password" autocomplete="off" placeholder="Paste your Google AI Studio API key"><button class="ibtn" id="gasKeyToggle" type="button" aria-label="Show API key"><svg class="ic"><use href="#i-eye"/></svg></button></div></div>
+      <button class="btn primary" id="gasLoad" type="button">Load available models</button>
+      <div class="field hidden" id="gasModelWrap" style="margin:0"><label for="gasModel">Choose a Gemini model</label><select class="inp" id="gasModel"></select></div>
+      <div class="small muted" id="gasStatus">API keys are stored on this device only for this connection. Free-tier availability and rate limits are controlled by Google and vary by model and account.</div>
+      <button class="btn hidden" id="gasSave" type="button">Save &amp; Connect</button>
+    </div>
+    <div class="note"><svg class="ic sm"><use href="#i-key"/></svg><span>Custom provider API keys are stored in your account settings. Google AI Studio keys connected above are kept in this device's local storage and are not synced to Firebase.</span></div>
   </div></div>
 </section>
 
@@ -1907,9 +1920,9 @@ const S={settings:{providers:[],selectedProviderId:null,reasoning:'balanced'},
  streaming:false,abort:null,agentStreaming:false,agentAbort:null,
  pendingAttachments:[],agentAttachments:[],agentMode:'auto',webAccess:false,selection:null,expanded:new Set(),techSel:null,appDraft:null,sheetTarget:'chat',pinned:true,zipMode:'new'};
 const activeProvider=()=>S.settings.providers.find(p=>p.id===S.settings.selectedProviderId)||S.settings.providers[0]||null;
-function saveSettings(){try{Cloud.saveSettings({providers:S.settings.providers,selectedProviderId:S.settings.selectedProviderId,reasoning:S.settings.reasoning,agentMode:S.agentMode||'auto',lastChatId:S.chat?S.chat.id:null});}catch(e){}}
+function saveSettings(){try{const providers=S.settings.providers.map(p=>{if(p.providerType==='google-ai-studio'){const q={...p};delete q.apiKey;return q;}return p;});Cloud.saveSettings({providers,selectedProviderId:S.settings.selectedProviderId,reasoning:S.settings.reasoning,agentMode:S.agentMode||'auto',lastChatId:S.chat?S.chat.id:null});}catch(e){}}
 function loadSettings(){try{const s=Cloud.settings||{};
- if(s.providers)S.settings.providers=s.providers;
+ if(s.providers)S.settings.providers=s.providers.map(p=>p.providerType==='google-ai-studio'?{...p,apiKey:(()=>{try{return localStorage.getItem('xflay.google-ai-studio.key')||'';}catch(_){return '';}})()}:p);
  if(s.selectedProviderId)S.settings.selectedProviderId=s.selectedProviderId;if(s.reasoning)S.settings.reasoning=s.reasoning;if(s.agentMode==='auto'||s.agentMode==='plan'||s.agentMode==='build')S.agentMode=s.agentMode;}catch(e){}}
 function applyTheme(){document.documentElement.setAttribute('data-theme','dark');}
 const persistChat=()=>S.chat&&DB.put('chats',S.chat);
@@ -2065,7 +2078,29 @@ function describeHttp(st,t){const b=(t||'').replace(/\s+/g,' ').trim();const sho
  if(st===404)return 'Endpoint or model not found (HTTP 404). Check Base URL and model name.'+(short?' Provider said: '+short:'');
  if(st===429)return 'Rate limited (HTTP 429).'+(short?' Provider said: '+short:'');
  return 'HTTP '+st+(short?' Provider said: '+short:'');}
-async function providerChat(o){const p=o.provider;if(!p)throw new Error('No AI provider is configured. Open Menu > Set Up AI.');
+async function geminiStudioChat(o){
+ const p=o.provider;if(!p||!p.apiKey)throw new Error('Google AI Studio is not connected on this device. Reconnect your API key in Connector Name.');
+ const msgs=Array.isArray(o.messages)?o.messages:[],contents=[],systemParts=[];
+ msgs.forEach(m=>{const role=m.role==='assistant'?'model':m.role==='system'?'system':'user',txt=typeof m.content==='string'?m.content:Array.isArray(m.content)?m.content.map(x=>typeof x==='string'?x:(x.text||'')).join(' '):String(m.content||'');if(!txt)return;if(role==='system'){systemParts.push({text:txt});return;}const last=contents[contents.length-1];if(last&&last.role===role)last.parts.push({text:txt});else contents.push({role,parts:[{text:txt}]});});
+ if(!contents.length)throw new Error('No text message was provided.');
+ const body={contents,generationConfig:{temperature:o.temperature??p.temperature??0.7,maxOutputTokens:o.maxTokens??p.maxTokens??4096}};
+ if(systemParts.length)body.systemInstruction={parts:systemParts};
+ const stream=!!(o.stream??p.stream),url='https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(o.model||p.model)+(stream?':streamGenerateContent?alt=sse':':generateContent');
+ const ac=new AbortController();let timedOut=false;const timeout=setTimeout(()=>{timedOut=true;ac.abort();},o.waitMs||180000);
+ if(o.signal){if(o.signal.aborted)ac.abort();else o.signal.addEventListener('abort',()=>ac.abort(),{once:true});}
+ let res;try{res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':p.apiKey},body:JSON.stringify(body),signal:ac.signal});}
+ catch(e){clearTimeout(timeout);if(timedOut)throw new Error('Google AI Studio request timed out.');if(e.name==='AbortError')throw e;throw new Error('Google AI Studio network error: '+(e.message||'request failed'));}
+ if(!res.ok){clearTimeout(timeout);let t='';try{t=await res.text();}catch(_){}throw new Error('Google AI Studio HTTP '+res.status+': '+(t.replace(/\s+/g,' ').slice(0,300)||'Request failed. Check API key, model access and quota.'));}
+ const getText=j=>((j.candidates||[])[0]&&((j.candidates[0].content||{}).parts||[]).map(x=>x.text||'').join(''))||'';
+ if(!stream){try{const j=await res.json(),c=getText(j);if(!c)throw new Error('Google returned no text. The model may have blocked the prompt.');if(o.onDelta)o.onDelta(c);return c;}finally{clearTimeout(timeout);}}
+ if(!res.body){clearTimeout(timeout);throw new Error('Streaming response is unavailable.');}
+ const reader=res.body.getReader(),decoder=new TextDecoder();let buffer='',full='';
+ try{while(true){const part=await reader.read();if(part.done)break;buffer+=decoder.decode(part.value,{stream:true});let i;while((i=buffer.indexOf('\n'))>=0){const line=buffer.slice(0,i).trim();buffer=buffer.slice(i+1);if(!line.startsWith('data:'))continue;const raw=line.slice(5).trim();if(!raw)continue;let j;try{j=JSON.parse(raw);}catch(_){continue;}const c=getText(j);if(c){full+=c;if(o.onDelta)o.onDelta(c);}}}
+  if(buffer.trim().startsWith('data:')){try{const j=JSON.parse(buffer.trim().slice(5));const c=getText(j);if(c){full+=c;if(o.onDelta)o.onDelta(c);}}catch(_){}}
+  return full;
+ }finally{clearTimeout(timeout);try{reader.releaseLock();}catch(_){}}
+}
+async function providerChat(o){const p=o.provider;if(!p)throw new Error('No AI provider is configured. Open Menu > Set Up AI.');if(p.providerType==='google-ai-studio')return geminiStudioChat(o);
  const headers={'Content-Type':'application/json'};if(p.apiKey)headers.Authorization='Bearer '+p.apiKey;
  const body={model:o.model||p.model,messages:o.messages,temperature:o.temperature??p.temperature??0.7,max_tokens:o.maxTokens??p.maxTokens??4096,stream:!!(o.stream??p.stream)};
  const rs=o.reasoning||S.settings.reasoning;if(p.supportsReasoning&&rs&&rs!=='off'){body.reasoning_effort={fast:'low',balanced:'medium',deep:'high',extra:'high',max:'high'}[rs]||'medium';}
@@ -2091,7 +2126,7 @@ async function providerChat(o){const p=o.provider;if(!p)throw new Error('No AI p
   if(o.thinkBudget&&thinkT&&!gotC&&Date.now()-thinkT>BUD){try{reader.cancel();}catch(_){}const e=new Error('The model kept thinking for too long.');e.thinkBudget=true;throw e;}}
  if(buf.trim())one(buf);
  return '';}
-async function fetchModels(p){const h={};if(p.apiKey)h.Authorization='Bearer '+p.apiKey;
+async function fetchModels(p){if(p.providerType==='google-ai-studio'){const res=await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=100',{headers:{'x-goog-api-key':p.apiKey}});if(!res.ok){let t='';try{t=await res.text();}catch(_){}throw new Error('Google AI Studio HTTP '+res.status+': '+t.slice(0,240));}const j=await res.json();return(j.models||[]).filter(m=>(m.supportedGenerationMethods||[]).includes('generateContent')).map(m=>String(m.name||'').replace(/^models\//,'')).filter(Boolean);}const h={};if(p.apiKey)h.Authorization='Bearer '+p.apiKey;
  const res=await fetch(modelsUrl(p.baseUrl),{headers:h});if(!res.ok)throw new Error(describeHttp(res.status,''));
  const j=await res.json();return((j.data||j.models||[]).map(m=>m.id||m.name).filter(Boolean));}
 /* ---------- rendering helpers ---------- */
@@ -3294,12 +3329,15 @@ function renderProviders(){const list=$('#pvList');
    <button class="btn sm" data-ptest="${p.id}">Test Connection</button>
    <button class="btn sm hrow-btn" data-pdel="${p.id}">${icon('trash','xs')}</button>
   </div></div>`).join(''):'<div class="note">'+icon('info','sm')+'<span>No providers yet. Add an OpenAI-compatible provider (Base URL, key, model).</span></div>');}
+$('#gasKeyToggle').onclick=()=>{const k=$('#gasKey'),show=k.type==='password';k.type=show?'text':'password';$('#gasKeyToggle').innerHTML=icon(show?'x':'eye');};
+$('#gasLoad').onclick=async()=>{const key=$('#gasKey').value.trim(),status=$('#gasStatus'),load=$('#gasLoad');if(!key){status.textContent='Paste your Google AI Studio API key first.';return;}load.disabled=true;load.textContent='Loading models…';status.textContent='Checking the API key and loading models from Google…';try{const p={providerType:'google-ai-studio',apiKey:key};const models=await fetchModels(p);if(!models.length)throw new Error('No models with generateContent support were returned for this key.');const preferred=models.find(m=>/flash/i.test(m))||models[0];$('#gasModel').innerHTML=models.map(m=>'<option value="'+esc(m)+'">'+esc(m)+'</option>').join('');$('#gasModel').value=preferred;$('#gasModelWrap').classList.remove('hidden');$('#gasSave').classList.remove('hidden');status.textContent=models.length+' compatible models found. Select a model, then save and connect. Model access and free quota depend on your Google project.';$('#gasSave').dataset.key=key;}catch(e){status.textContent=e.message||'Could not connect to Google AI Studio.';$('#gasModelWrap').classList.add('hidden');$('#gasSave').classList.add('hidden');}finally{load.disabled=false;load.textContent='Load available models';}};
+$('#gasSave').onclick=()=>{const key=$('#gasSave').dataset.key||$('#gasKey').value.trim(),model=$('#gasModel').value;if(!key||!model)return;let p=S.settings.providers.find(x=>x.providerType==='google-ai-studio');if(p){p.apiKey=key;p.model=model;p.name='Google AI Studio';p.baseUrl='https://generativelanguage.googleapis.com/v1beta';p.stream=true;p.vision=false;p.lastTest=true;}else{p={id:uid(),name:'Google AI Studio',providerType:'google-ai-studio',baseUrl:'https://generativelanguage.googleapis.com/v1beta',apiKey:key,model,temperature:0.7,maxTokens:4096,stream:true,supportsReasoning:false,vision:false,lastTest:true};S.settings.providers.push(p);}try{localStorage.setItem('xflay.google-ai-studio.key',key);}catch(e){toast('Could not save the API key on this device. Check browser storage.','err');return;}S.settings.selectedProviderId=p.id;saveSettings();renderProviders();updateChips();renderChat();$('#gasStatus').textContent='Connected on this device. Your Google AI Studio key is not synced to Firebase.';toast('Google AI Studio connected.','ok');};
 $('#pvList').addEventListener('click',e=>{const u=e.target.closest('[data-puse]');if(u){S.settings.selectedProviderId=u.dataset.puse;saveSettings();renderProviders();updateChips();renderChat();return;}
  const ed=e.target.closest('[data-pedit]');if(ed){openProviderForm(S.settings.providers.find(p=>p.id===ed.dataset.pedit));return;}
  const t=e.target.closest('[data-ptest]');if(t){openTestModal(S.settings.providers.find(p=>p.id===t.dataset.ptest));return;}
  const dl=e.target.closest('[data-pdel]');if(dl){const p=S.settings.providers.find(x=>x.id===dl.dataset.pdel);
   confirmDlg({title:'Delete provider?',body:'Removes "'+(p?p.name:'')+'" from this browser. This cannot be undone.',ok:'Delete',danger:true}).then(async ok=>{
-   if(ok){S.settings.providers=S.settings.providers.filter(x=>x.id!==p.id);if(S.settings.selectedProviderId===p.id)S.settings.selectedProviderId=null;saveSettings();renderProviders();updateChips();renderChat();}});}});
+   if(ok){S.settings.providers=S.settings.providers.filter(x=>x.id!==p.id);if(p.providerType==='google-ai-studio'){try{localStorage.removeItem('xflay.google-ai-studio.key');}catch(_){}}if(S.settings.selectedProviderId===p.id)S.settings.selectedProviderId=null;saveSettings();renderProviders();updateChips();renderChat();}});}});
 $('#btnPvAdd').onclick=()=>openProviderForm(null);
 function openProviderForm(p){editingProviderId=p?p.id:null;$('#pfTitle').textContent=p?'Edit Provider':'Add Provider';
  $('#pfName').value=p?p.name:'';$('#pfUrl').value=p?p.baseUrl:'';$('#pfKey').value=p?p.apiKey:'';$('#pfModel').value=p?p.model:'';
