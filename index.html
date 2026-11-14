@@ -2091,7 +2091,7 @@ async function providerChat(o){const p=o.provider;if(!p)throw new Error('No AI p
  if(!body.stream||!res.body){let j;try{j=await res.json();}catch(e){clearTimeout(hdr);if(timedOut)throw tmo();throw e;}clearTimeout(hdr);const m=(j.choices&&j.choices[0]&&j.choices[0].message)||{};const c=m.content||'';
   if(o.onDelta&&c)o.onDelta(c);if(o.onReasoning&&(m.reasoning_content||m.reasoning))o.onReasoning(m.reasoning_content||m.reasoning);return c;}
  const reader=res.body.getReader(),dec=new TextDecoder();let buf='';const IDLE=o.idleMs||12000,IDLEC=25000,FIRST=o.firstMs||40000;let started=false,thinkT=0,gotC=false,prog=false,lastProg=Date.now();
- const rsel=o.reasoning||S.settings.reasoning,BUD=o.thinkMs||({off:8000,fast:12000,balanced:12000,deep:45000,extra:90000,max:150000}[rsel]||12000);
+ const rsel=o.reasoning||S.settings.reasoning,BUD=o.thinkMs||({off:8000,fast:9000,balanced:12000,deep:22000,extra:35000,max:60000}[rsel]||9000);
  const rd=()=>{const lim=gotC?IDLEC:(prog?IDLE:FIRST),left=Math.max(400,lim-(Date.now()-lastProg));return new Promise((ok,no)=>{const t=setTimeout(()=>{try{reader.cancel();}catch(_){}no(new Error('Network error: the provider stopped responding for '+Math.round(lim/1000)+'s'));},left);reader.read().then(v=>{clearTimeout(t);ok(v);},e=>{clearTimeout(t);no(e);});});};
  const one=line=>{line=line.trim();if(!line.startsWith('data:'))return false;const data=line.slice(5).trim();if(data==='[DONE]')return true;
   let j;try{j=JSON.parse(data)}catch(_){return false}
@@ -2661,7 +2661,7 @@ function renderAtts(){const host=$('#chatAtts');
 $('#chatAtts').addEventListener('click',e=>{const b=e.target.closest('[data-rmatt]');if(b){S.pendingAttachments.splice(+b.dataset.rmatt,1);renderAtts();}});
 
 /* ---------- system prompts ---------- */
-const THINK_RULE='Reasoning speed: think ULTRA fast. Your private reasoning must be tiny: at most 3 short lines (under 60 words in total), then act or answer at once. Never deliberate, never re-check things you already know, never plan twice. Simple requests need no reasoning at all.';
+const THINK_RULE='Reasoning speed: think ULTRA fast. Your private reasoning must be tiny: at most 2 short lines (under 40 words in total), then output TOOL_CALL or answer immediately. Never deliberate before a tool call, never re-check things you already know, never plan twice. Simple requests need no reasoning at all.';
 const LINKS_RULE='When the user asks for website link(s) (a site, service, tool, platform, ad network, store, etc.), the application may perform live web research and supply LIVE WEB CONTEXT. Reply directly in the user\'s language. If usable live sources are available, present those results and only use URLs that appear in those sources. Do NOT say "I don\'t have a web-search tool of my own" or make contradictory statements. Output exactly one fenced code block tagged weblinks containing a JSON array of 3 to 8 items (one item if the user asks for one specific site), each shaped like {"name":"Google AdSense","tag":"short category line in the user\'s language","desc":"one or two sentences in the user\'s language","url":"https://official-site.example","open":"short label in the user\'s language"}. If search returns FAILED or NO USABLE RESULTS, state clearly that live verification failed; do not claim any URL was live-verified. For well-known services whose official domain is highly certain from stable knowledge, you MAY provide exact known domains as clearly UNVERIFIED fallback links in the same weblinks block (for example Google AdSense: https://adsense.google.com/, Media.net: https://www.media.net/, PropellerAds: https://propellerads.com/, Adsterra: https://adsterra.com/, Ezoic: https://www.ezoic.com/). Label each fallback as not live-verified. Never guess unfamiliar domains or invent URLs; if uncertain, provide no link. Do not write raw URLs outside the block.';
 function isLinkIntent(t){t=String(t||'').trim();if(!t||t.length>400)return false;
  const noun=/(\blinks?\b|\burls?\b|\bweb\s?sites?\b|\bsites?\b|\u09b2\u09bf\u0982\u0995|\u09b2\u09bf\u0999\u09cd\u0995|\u0993\u09af\u09bc\u09c7\u09ac\u09b8\u09be\u0987\u099f|\u0993\u09af\u09bc\u09c7\u09ac \u09b8\u09be\u0987\u099f|\u09b8\u09be\u0987\u099f)/i;
@@ -5106,7 +5106,7 @@ Your standard: a careful senior engineer who is also fast. You make three promis
 ## 1. ENVIRONMENT
 
 - The workspace is a set of text files with forward-slash paths (for example index.html or src/app.js). It persists across the messages of a conversation, so files you created or edited earlier are still there.
-- An uploaded single file is placed in the workspace root. An uploaded zip is already extracted with its folder structure intact. If the user pastes code into the chat, save it with create_file (infer a sensible file name; do not ask) and continue as normal.
+- An uploaded single file is placed in the workspace root (/home/agent and /mnt/user-data/uploads). An uploaded zip is already extracted with its folder structure intact. When the user uploads file(s) and asks to update, fix, or modify them, ALWAYS edit those exact uploaded file path(s) in place using edit_file — NEVER create a separate renamed or copied file (like index.html, fixed.html, updated_*, or *_v2) unless the user explicitly asks for a new separate file. If the user pastes code into the chat, save it with create_file (infer a sensible file name; do not ask) and continue as normal.
 - The app keeps the original of every uploaded file and snapshots before every change. The user can undo from the UI, so you never make backups.
 - Binary files (images, fonts, nested archives) cannot be read or edited. Leave them untouched.
 - You work on a small Linux-style virtual computer inside this app (an emulation, not a real server). Folders:
@@ -5295,6 +5295,7 @@ This is where quality and speed are won or lost. Follow it exactly.
 
 **UPLOADED SINGLE FILE**
 - Same as above. If it is large, use section 5. The attached text you may see in the message can be shortened; the workspace holds the full file, so use read_file and search, not the attached excerpt, for exact text.
+- ALWAYS update the exact uploaded filename in place with edit_file (never create a differently-named copy or index.html unless the user explicitly asked for a separate new file).
 
 **ZIP OR MULTI-FILE PROJECT**
 - list_files, then read only the manifest, entry, and config files (package.json, index.html, main script, README) to learn the architecture: entry point, how files load each other (imports, script tags), where shared state lives.
@@ -5509,6 +5510,14 @@ function tCreate(run,a){
  const path=normPath(a.path);
  if(badPath(path))return E('Invalid path "'+(a.path||'')+'". Use a relative path with forward slashes and no "..".');
  if(run.files[path])return E('File already exists: '+path+'. Use edit_file to change it (or delete_file, then create_file, for a full rewrite of a small file).');
+ if(run.uploaded&&run.uploaded.length&&run.uploaded.length<=4){
+  const ut=String(run.userText||'').toLowerCase(),base=path.split('/').pop().toLowerCase(),ext=base.includes('.')?base.split('.').pop():'';
+  const unmod=run.uploaded.filter(u=>run.base[u]&&run.files[u]&&run.base[u].content===run.files[u].content);
+  const sameExt=unmod.find(u=>{const ub=u.split('/').pop().toLowerCase(),ue=ub.includes('.')?ub.split('.').pop():'';return ext&&ue===ext;});
+  const looksCopy=/(?:^|\/)(?:new|updated|fixed|copy|modified)_|_(?:new|updated|fixed|copy|v\d+)\./i.test(path);
+  const askedNew=ut.includes(base)||/\b(new file|separate file|another file|split into|rename to|save as)\b|নতুন ফাইল/i.test(ut);
+  if((looksCopy||(sameExt&&unmod.length))&&!askedNew){
+   return E('Do not create a separate file "'+path+'". The user uploaded '+(sameExt||run.uploaded[0])+' — edit that exact uploaded file in place with edit_file (and export that same file).');}}
  if(typeof a.content!=='string')return E('content is required (a string).');
  const allowEmpty=a.allow_empty===true||/^(true|1|yes)$/i.test(String(a.allow_empty||''));
  {const why=(allowEmpty&&!REST_MARK.test(a.content))?null:placeholderWhy(path,a.content);if(why)return E('Refusing to create '+path+' because '+why+'. Write the complete, working file content (no placeholders, no "rest unchanged" comments).'+(/empty|only comments/.test(why)?' If the user explicitly asked for an empty/blank file, call create_file again with "content": "" and "allow_empty": true.':''));}
@@ -5706,7 +5715,7 @@ function vsParse(cmd){
    if(/\s|[;|&<>`#]/.test(ch))break;
    if(ch==="'"){quoted=true;i++;while(i<n&&cmd[i]!=="'"){val+=cmd[i];i++;}if(i>=n)return{err:'Unbalanced single quote.'};i++;continue;}
    if(ch==='"'){quoted=true;i++;while(i<n&&cmd[i]!=='"'){
-     if(cmd[i]==='\\'){i++;if(i>=n)return{err:'Unbalanced double quote.'};val+=cmd[i]==='n'?'\n':cmd[i]==='t'?'\t':cmd[i];i++;continue;}
+     if(cmd[i]==='\\'){const nx=cmd[i+1];if(nx===undefined)return{err:'Unbalanced double quote.'};if(nx==='"'||nx==='\\'||nx==='$'||nx==='`'){val+=nx;i+=2;continue;}if(nx==='\n'){i+=2;continue;}val+='\\';i++;continue;}
      if(cmd[i]==='`')return{err:'Unsupported syntax: backticks (`...`) inside double quotes are not supported.'};
      if(cmd[i]==='$'&&(cmd[i+1]==='('||cmd[i+1]==='{'||/[A-Za-z_@#?*0-9]/.test(cmd[i+1]||'')))return{err:'Unsupported syntax: variables and $(...) are not supported.'};
      val+=cmd[i];i++;}
@@ -5935,26 +5944,42 @@ async function vsRunOne(run,cmdObj,stdin){
    if(args.some(a=>a==='-i'||a.startsWith('-i'))){fail('sed: -i in-place edit is not supported; use edit_file or sed -n \'A,Bp\' (read-only).',2);break;}
    if(!args.includes('-n')){fail('sed: only read-only sed -n \'A,Bp\' is supported.',2);break;}
    const rest=args.filter(a=>a!=='-n');if(!rest.length){fail('sed: missing range script like \'1,50p\'',2);break;}
-   const script=rest[0].trim(),files=rest.slice(1);
-   const m=/^(\d+)(?:,(\d+|\$))?p$/.exec(script);
-   if(!m){fail('sed: only read-only line range \'A,Bp\' or \'Ap\' is supported.',2);break;}
-   const from=Math.max(1,parseInt(m[1],10)),toRaw=m[2];
-   const sliceSed=txt=>{const ls=splitLines(txt),to=toRaw==='$'?ls.length:toRaw?Math.min(ls.length,parseInt(toRaw,10)):from;
-    if(from>ls.length||to<from)return '';return ls.slice(from-1,to).join('\n')+'\n';};
+   const parts=rest[0].trim().split(';').map(s=>s.trim()).filter(Boolean),ranges=[],files=rest.slice(1);
+   let badSed=false;
+   for(const sp of parts){const m=/^(\d+)(?:,(\d+|\$))?p$/.exec(sp);if(!m){badSed=true;break;}ranges.push([Math.max(1,parseInt(m[1],10)),m[2]]);}
+   if(badSed||!ranges.length){fail('sed: only read-only line range \'A,Bp\' or \'Ap\' is supported.',2);break;}
+   const sliceSed=txt=>{const ls=splitLines(txt);let res='';
+    ranges.forEach(([from,toRaw])=>{const to=toRaw==='$'?ls.length:toRaw?Math.min(ls.length,parseInt(toRaw,10)):from;
+     if(from<=ls.length&&to>=from)res+=ls.slice(from-1,to).join('\n')+'\n';});return res;};
    if(!files.length){out+=sliceSed(stdin||'');break;}
    files.forEach(p=>{const g=readOptFile(p);if(g.err){fail(g.err,2);return;}if(g.f.binary){out+='Binary file ('+byteLen(g.f.content||'')+' bytes)\n';return;}out+=sliceSed(g.f.content||'');});break;}
   case 'grep':{
-   let fn=false,fi=false,fE=false,fF=false,fr=false,fc=false,fl=false,fv=false,fw=false,A=0,B=0;
+   let fn=false,fi=false,fE=false,fF=false,fr=false,fc=false,fl=false,fv=false,fw=false,fo=false,fq=false,fh=false,fH=false,A=0,B=0,maxM=Infinity;
    const pats=[],rest=[];
    for(let i=0;i<args.length;i++){const a=args[i];
     if(a==='-e'&&i+1<args.length){pats.push(args[++i]);continue;}
     if((a==='-A'||a==='-B'||a==='-C')&&i+1<args.length){const v=Math.max(0,parseInt(args[++i],10)||0);if(a==='-A')A=v;else if(a==='-B')B=v;else{A=B=v;}continue;}
+    if(a==='-m'&&i+1<args.length){maxM=Math.max(0,parseInt(args[++i],10)||Infinity);continue;}
+    if(a.startsWith('--')){
+     if(a==='--ignore-case')fi=true;else if(a==='--extended-regexp')fE=true;else if(a==='--fixed-strings')fF=true;
+     else if(a==='--line-number')fn=true;else if(a==='--files-with-matches')fl=true;else if(a==='--count')fc=true;
+     else if(a==='--invert-match')fv=true;else if(a==='--recursive')fr=true;else if(a==='--word-regexp')fw=true;
+     else if(a==='--only-matching')fo=true;else if(a==='--quiet'||a==='--silent')fq=true;
+     else if(a==='--include'||a==='--exclude'||a==='--exclude-dir'){i++;}
+     continue;}
     if(a.startsWith('-')&&a.length>1){
-     for(const ch of a.slice(1)){if(ch==='n')fn=true;else if(ch==='i')fi=true;else if(ch==='E')fE=true;else if(ch==='F')fF=true;else if(ch==='r'||ch==='R')fr=true;else if(ch==='c')fc=true;else if(ch==='l')fl=true;else if(ch==='v')fv=true;else if(ch==='w')fw=true;else if(/^\d+$/.test(a.slice(1)))break;}}
+     for(const ch of a.slice(1)){if(ch==='n')fn=true;else if(ch==='i')fi=true;else if(ch==='E')fE=true;else if(ch==='F')fF=true;else if(ch==='r'||ch==='R')fr=true;else if(ch==='c')fc=true;else if(ch==='l')fl=true;else if(ch==='v')fv=true;else if(ch==='w')fw=true;else if(ch==='o')fo=true;else if(ch==='q')fq=true;else if(ch==='h')fh=true;else if(ch==='H')fH=true;else if(/^\d+$/.test(a.slice(1)))break;}}
     else rest.push(a);}
    if(!pats.length&&rest.length)pats.push(rest.shift());
    if(!pats.length){fail('grep: missing pattern',2);break;}
-   let srcPat=pats.map(p=>fF?p.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'):p).join('|');
+   const breToRe=p=>{let s='',inBr=false;
+    for(let i=0;i<p.length;i++){const c=p[i];
+     if(inBr){if(c==='\\'&&i+1<p.length){s+='\\'+p[++i];continue;}if(c===']')inBr=false;s+=c;continue;}
+     if(c==='\\'&&i+1<p.length){const nx=p[++i];if('()+?{}|'.includes(nx))s+=nx;else if(nx==='<'||nx==='>')s+='\\b';else s+='\\'+nx;continue;}
+     if(c==='['){inBr=true;s+='[';continue;}
+     if('()+?{}|'.includes(c))s+='\\'+c;else s+=c;}
+    return s;};
+   let srcPat=pats.map(p=>fF?p.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'):fE?p:breToRe(p)).join('|');
    if(pats.length>1)srcPat='(?:'+srcPat+')';
    if(fw)srcPat='\\b(?:'+srcPat+')\\b';
    let re;try{re=new RegExp(srcPat,fi?'i':'');}catch(e){fail('grep: invalid pattern: '+e.message,2);break;}
@@ -5966,12 +5991,14 @@ async function vsRunOne(run,cmdObj,stdin){
     if(r.err){fail('grep: '+p+': '+r.err,2);return;}
     if(vsIsDir(run,r)){if(!fr){fail('grep: '+p+': Is a directory',2);return;}addDirRec(r,p==='.'?'':p.replace(/\/+$/,''));return;}
     const g=readOptFile(p);if(g.err){fail(g.err,2);return;}if(!g.f.binary)targets.push({name:p,txt:g.f.content||''});});
-   const multi=targets.length>1||fr;let matchedAny=false;
+   const multi=!fh&&(fH||targets.length>1||fr);let matchedAny=false;
    targets.forEach(t=>{
     const ls=String(t.txt).split('\n');if(ls.length>1&&ls[ls.length-1]==='')ls.pop();
     const hits=new Set(),printSet=new Set();let countM=0;
-    ls.forEach((line,idx)=>{re.lastIndex=0;const m=re.test(line),hit=fv?!m:m;if(hit){countM++;hits.add(idx);}});
+    for(let idx=0;idx<ls.length;idx++){const line=ls[idx];re.lastIndex=0;const mm=re.exec(line),m=!!mm,hit=fv?!m:m;
+     if(hit){countM++;hits.add(idx);if(countM>=maxM)break;}}
     if(countM>0)matchedAny=true;
+    if(fq)return;
     if(fl){if(countM>0)out+=(t.name||'(standard input)')+'\n';return;}
     if(fc){out+=(multi&&t.name?t.name+':':'')+countM+'\n';return;}
     hits.forEach(idx=>{for(let k=Math.max(0,idx-B);k<=Math.min(ls.length-1,idx+A);k++)printSet.add(k);});
@@ -5980,8 +6007,9 @@ async function vsRunOne(run,cmdObj,stdin){
      if((A||B)&&prevIdx>=0&&idx>prevIdx+1)out+='--\n';prevIdx=idx;
      const sep=hits.has(idx)?':':'-';
      const prefix=(multi&&t.name?t.name+sep:'')+(fn?(idx+1)+sep:'');
-     out+=prefix+ls[idx]+'\n';});});
-   if(code===0&&!matchedAny)code=1;break;}
+     if(fo&&!fv&&hits.has(idx)){const gre=new RegExp(re.source,(fi?'i':'')+'g');let gm;while((gm=gre.exec(ls[idx]))){out+=prefix+gm[0]+'\n';if(!gm[0])gre.lastIndex++;}}
+     else out+=prefix+ls[idx]+'\n';});});
+   if(code===0&&!matchedAny){code=1;return{out,err,code,mut,grepMiss:true};}break;}
   case 'find':{
    let rootArg='.',namePat=null,nameI=false,ftype=null,maxD=Infinity;
    for(let i=0;i<args.length;i++){const a=args[i];
@@ -6014,16 +6042,24 @@ async function vsRunOne(run,cmdObj,stdin){
    for(const l of ls){if(res.length&&res[res.length-1].l===l)res[res.length-1].c++;else res.push({l,c:1});}
    out=res.map(x=>(fc?String(x.c).padStart(7)+' ':'')+x.l).join('\n')+(res.length?'\n':'');break;}
   case 'cut':{
-   let delim='\t',fSpec='';const ps=[];
+   let delim='\t',fSpec='',cSpec='';const ps=[];
    for(let i=0;i<args.length;i++){const a=args[i];
     if(a==='-d'&&i+1<args.length)delim=args[++i];else if(a.startsWith('-d')&&a.length>2)delim=a.slice(2);
     else if(a==='-f'&&i+1<args.length)fSpec=args[++i];else if(a.startsWith('-f')&&a.length>2)fSpec=a.slice(2);
+    else if(a==='-c'&&i+1<args.length)cSpec=args[++i];else if(a.startsWith('-c')&&a.length>2)cSpec=a.slice(2);
+    else if(a.startsWith('--delimiter='))delim=a.slice(12);
+    else if(a.startsWith('--fields='))fSpec=a.slice(9);
+    else if(a.startsWith('--characters='))cSpec=a.slice(13);
     else ps.push(a);}
-   if(!fSpec){fail('cut: -f is required');break;}
-   const ranges=fSpec.split(',').map(s=>{const m=/^(\d+)-(\d*)$/.exec(s);return m?[+m[1],m[2]?+m[2]:Infinity]:[+s,+s];});
+   if(!fSpec&&!cSpec){fail('cut: -f or -c is required');break;}
+   const parseRanges=spec=>spec.split(',').map(s=>{const m=/^(\d*)-(\d*)$/.exec(s.trim());if(m)return[m[1]?Math.max(1,+m[1]):1,m[2]?+m[2]:Infinity];const n=Math.max(1,+s||1);return[n,n];});
    let txt=stdin||'';if(ps.length){const g=readOptFile(ps[0]);if(g.err){fail(g.err);break;}txt=g.f.content||'';}
-   out=splitLines(txt).map(line=>{const cols=line.split(delim),pick=[];
-    cols.forEach((v,i)=>{const idx=i+1;if(ranges.some(([a,b])=>idx>=a&&idx<=b))pick.push(v);});return pick.join(delim);}).join('\n')+(txt?'\n':'');break;}
+   if(cSpec){const cr=parseRanges(cSpec);
+    out=splitLines(txt).map(line=>{let s='';for(let i=0;i<line.length;i++){const idx=i+1;if(cr.some(([a,b])=>idx>=a&&idx<=b))s+=line[i];}return s;}).join('\n')+(txt?'\n':'');}
+   else{const ranges=parseRanges(fSpec);
+    out=splitLines(txt).map(line=>{const cols=line.split(delim),pick=[];
+     cols.forEach((v,i)=>{const idx=i+1;if(ranges.some(([a,b])=>idx>=a&&idx<=b))pick.push(v);});return pick.join(delim);}).join('\n')+(txt?'\n':'');}
+   break;}
   case 'diff':{
    const ps=args.filter(a=>!a.startsWith('-'));
    if(ps.length===1){const r=vsResolve(run,ps[0]);if(r.err){fail('diff: '+ps[0]+': '+r.err);break;}const d=tDiff(run,{path:r.rel});if(!d.ok){fail(d.out);break;}out=d.out+(d.out.endsWith('\n')?'':'\n');break;}
@@ -6143,7 +6179,7 @@ async function tShell(run,a,sig){
  const cmdStr=a&&a.command;
  if(typeof cmdStr!=='string'||!cmdStr.trim())return E('command is required (a non-empty string).');
  const parsed=vsParse(cmdStr);if(parsed.err)return E(parsed.err);
- let totalOut='',lastCode=0,anyMut=false;
+ let totalOut='',lastCode=0,lastGrepMiss=false,anyMut=false;
  for(const item of parsed.chain){
   if(item.op==='&&'&&lastCode!==0)continue;
   if(item.op==='||'&&lastCode===0)continue;
@@ -6164,14 +6200,14 @@ async function tShell(run,a,sig){
      const prev=run.files[rr.rel]&&!run.files[rr.rel].binary?String(run.files[rr.rel].content||''):'';
      run.files[rr.rel]={content:(rd.mode==='append'?prev+stOut:stOut)};anyMut=true;}
     stOut='';}
-   lastCode=res.code;
+   lastCode=res.code;lastGrepMiss=!!res.grepMiss;
    if(pi<item.pipe.length-1){pipeIn=stOut;if(stErr)totalOut+=stErr;}
    else{totalOut+=stOut+stErr;}}}
  let cutNotice='';
  if(totalOut.length>OUT_CAP){totalOut=totalOut.slice(0,OUT_CAP);cutNotice='\n[output truncated - narrow it with head, tail, grep or sed -n]';}
  const sep=totalOut&&!totalOut.endsWith('\n')?'\n':'';
  const finalText=totalOut+cutNotice+(cutNotice?'\n':sep)+'[exit '+lastCode+' | cwd '+run.cwd+']';
- return R(finalText,'Running command','terminal',lastCode===0,cmdStr.trim().slice(0,120),anyMut);}
+ return R(finalText,'Running command','terminal',lastCode===0||lastGrepMiss,cmdStr.trim().slice(0,120),anyMut);}
 
 function execTool(run,call,sig){
  const a=call.args||{};
@@ -6258,9 +6294,11 @@ function build(system,L){
 const FAST_NOTE='\n\nIMPORTANT: your previous attempt was cut off because it thought for too long. Do not deliberate. Use at most two short lines of private reasoning, then act or answer immediately.';
 function withFast(msgs){const m=(msgs||[]).slice();if(m[0]&&m[0].role==='system'&&typeof m[0].content==='string')m[0]=Object.assign({},m[0],{content:m[0].content+FAST_NOTE});return m;}
 async function modelCall(o){
- let fast=false;
+ let fast=false;const pref=fastThink();
  for(let a=0;;a++){let got=false;
-  try{return await providerChat(Object.assign({provider:activeProvider(),reasoning:(fast&&fastThink()==='fast')?'off':fastThink(),thinkBudget:a<2,thinkMs:fast?15000:undefined},o,{messages:fast?withFast(o.messages):o.messages,onDelta:d=>{got=true;o.onDelta&&o.onDelta(d);}}));}
+  const rs=fast?((pref==='deep'||pref==='extra'||pref==='max')?'fast':'off'):pref;
+  const bud=fast?8000:({off:8000,fast:9000,balanced:12000,deep:20000,extra:30000,max:45000}[rs]||9000);
+  try{return await providerChat(Object.assign({provider:activeProvider(),reasoning:rs,thinkBudget:a<2,thinkMs:bud},o,{messages:fast?withFast(o.messages):o.messages,onDelta:d=>{got=true;o.onDelta&&o.onDelta(d);}}));}
   catch(e){if(e.name==='AbortError')throw e;const msg=String(e.message||''),tb=!!e.thinkBudget,stall=/stopped responding|did not respond/.test(msg),tr=/HTTP (429|5\d\d)|Network error/.test(msg);
    if((!tb&&!tr)||a>=2||got)throw e;
    if(tb||stall)fast=true;
@@ -6370,7 +6408,7 @@ function wrapUp(o,run){
  _abAnim.add(am.id);}
 async function runTask(o){
  const am=o.am;am.activity=am.activity||[];am.caAgent=true;if(o.mode==='project')am.caProject=true;
- const run={files:o.files,base:snapBase(o.files),exports:[],checked:{},diffed:{},calls:0,bad:0,empty:0,nudged:false,lastKey:'',lastFail:false,cwd:VS_HM,workers:new Set()};
+ const run={files:o.files,base:snapBase(o.files),uploaded:o.uploaded||[],userText:o.userText||'',exports:[],checked:{},diffed:{},calls:0,bad:0,empty:0,nudged:false,lastKey:'',lastFail:false,cwd:VS_HM,workers:new Set()};
  const killWorkers=()=>run.workers.forEach(w=>{try{w.terminate();}catch(_){}});
  if(o.signal)o.signal.addEventListener('abort',killWorkers,{once:true});
  try{await loop(o,run);am.status='done';}
@@ -6408,7 +6446,7 @@ function chatHistory(chat,am){
    const imgs=(m.rawAtts||[]).filter(a=>a.kind==='image'&&a.dataUrl);imgs.forEach(a=>{if(!activeProvider()||!activeProvider().vision)c+='\n[Image attached: '+a.name+']';});
    {const miss=(m.attachments||[]).filter(a=>(a.kind==='text'||a.kind==='zip')&&!(m.rawAtts||[]).some(r=>r&&r.name===a.name&&(typeof r.content==='string'||r.files)));
     if(miss.length)c+='\n[Attachment metadata only: '+miss.map(a=>a.name).join(', ')+'. Its contents are not available on this device unless it is already in the workspace (call list_files). Never guess its contents; if it is missing, tell the user to upload it again.]';}
-   if(last){c+='\n\n'+wsNote(chat.ws.files);if(chat.wsCount&&!Object.keys(chat.ws.files).length)c+='\n[This conversation earlier had '+chat.wsCount+' workspace file(s) (e.g. '+(chat.wsFiles||[]).slice(0,5).join(', ')+') but their contents are not available on this device. Ask the user to upload them again; never guess their contents.]';if(m.webContext)c+='\n\n--- LIVE WEB CONTEXT (fresh web research for this message; use its concrete details, do not invent facts that are not in it) ---\n'+m.webContext+'\n--- END LIVE WEB CONTEXT ---';}
+   if(last){if(m.caAddedN)c+='\n[UPLOADED IN THIS MESSAGE - update these existing file(s) in place with edit_file; do NOT create a differently-named copy unless explicitly asked: '+(m.caAdded||[]).slice(0,12).join(', ')+(m.caAddedN>12?' ... ('+m.caAddedN+' files in total)':'')+']';c+='\n\n'+wsNote(chat.ws.files);if(chat.wsCount&&!Object.keys(chat.ws.files).length)c+='\n[This conversation earlier had '+chat.wsCount+' workspace file(s) (e.g. '+(chat.wsFiles||[]).slice(0,5).join(', ')+') but their contents are not available on this device. Ask the user to upload them again; never guess their contents.]';if(m.webContext)c+='\n\n--- LIVE WEB CONTEXT (fresh web research for this message; use its concrete details, do not invent facts that are not in it) ---\n'+m.webContext+'\n--- END LIVE WEB CONTEXT ---';}
    pushHist(out,'user',c,last?visionParts(c,imgs):null);}
   else pushHist(out,'assistant',stripFences(m.content));});
  return out;}
@@ -6445,7 +6483,7 @@ window.sendChat=async function(){
    const hd=chat.messages.slice(0,-2).filter(x=>x.content&&x.status!=='error').slice(-4),linkQ=isLinkIntent(text)&&!atts.length;
    const dec=linkQ?{search:true,queries:[text.slice(0,160)+' official website']}:await decideSearch(text+(atts.length?' [with attachments]':''),hd,sig);
    if(dec.search&&dec.queries.length){const ctx=await researchWeb(am,dec.queries,sig,'#msgs',{read:!linkQ});const um=chat.messages[chat.messages.length-2];if(ctx)um.webContext=ctx;}}
-  await runTask({mode:'chat',am,sel:'#msgs',signal:sig,files:ws.files,ws,zipName:ws.name||(chat.title||'project').replace(/[^\w\- ]+/g,'').trim().slice(0,40)||'project',
+  await runTask({mode:'chat',am,sel:'#msgs',signal:sig,files:ws.files,ws,uploaded:ing.added,userText:text,zipName:ws.name||(chat.title||'project').replace(/[^\w\- ]+/g,'').trim().slice(0,40)||'project',
    system:systemPrompt('chat'),history:chatHistory(chat,am),persist:throttle(()=>persistChat())});
  }catch(e){
   if(e.name==='AbortError')am.status='stopped';
@@ -6484,8 +6522,11 @@ window.sendAgent=async function(){
  p.agent.push({id:uid(),role:'user',content:text||'(selected files)',attachments:atts.map(a=>({name:a.path||a.name,size:a.size,kind:a.kind})),createdAt:Date.now(),status:'done'});
  S.agentAttachments=[];inp.value='';if(agentDraftKey())Cloud.draft.del(agentDraftKey());autoGrow(inp);renderAgentAtts();
  const trim=t=>{t=String(t||'');return t.length>ATT_BUDGET?t.slice(0,ATT_BUDGET)+'\n\n[File contains '+t.length+' characters. First '+ATT_BUDGET+' characters shown above for prompt context. Full file is loaded in the workspace; use read_file(path, from, to) and search to read any region.]':t;};
- const sel=atts.filter(a=>a.kind==='project').map(a=>a.path||a.name),imgs=atts.filter(a=>a.kind==='image');
+ const sel=atts.filter(a=>a.kind==='project').map(a=>a.path||a.name),imgs=atts.filter(a=>a.kind==='image'),upAtts=atts.filter(a=>a.kind==='text'||a.kind==='zip');
+ const ing=upAtts.length?ingest({files:p.files,name:p.name},upAtts):{added:[],skipped:0};
+ if(ing.added.length)renderExplorer();
  let extra='';if(sel.length)extra+='[The user selected these project files for this request: '+sel.join(', ')+']';
+ if(ing.added.length)extra+='\n[UPLOADED IN THIS MESSAGE — ingested into project workspace; update these existing file(s) in place with edit_file; do NOT create a differently-named copy unless explicitly asked: '+ing.added.slice(0,12).join(', ')+(ing.added.length>12?' ...':'')+']';
  atts.filter(a=>a.kind!=='project'&&a.kind!=='image'&&typeof a.content==='string').forEach(a=>{extra+='\n\n--- ATTACHED '+(a.path||a.name)+' ---\n'+trim(a.content)+'\n--- END ATTACHED ---';});
  imgs.forEach(a=>{if(!activeProvider().vision)extra+='\n[Image attached: '+a.name+']';});
  const am={id:uid(),role:'assistant',content:'',createdAt:Date.now(),status:'streaming',activity:[]};
@@ -6497,7 +6538,7 @@ window.sendAgent=async function(){
    const hd=p.agent.filter(x=>x!==am&&x.status==='done'&&x.content).slice(0,-1).slice(-4);
    const dec=await decideSearch(text,hd,sig,'The user is talking to a coding agent that builds Android WebView apps and websites inside a project.');
    if(dec.search&&dec.queries.length){const ctx=await researchWeb(am,dec.queries,sig,'#agentMsgs');if(ctx)extra+='\n\nLIVE WEB CONTEXT (fresh research for this request; use its concrete details):\n'+ctx.slice(0,9000);}}
-  await runTask({mode:'project',am,sel:'#agentMsgs',signal:sig,files:p.files,project:p,zipName:(p.name||'project').replace(/[^\w\- ]+/g,'').trim()||'project',
+  await runTask({mode:'project',am,sel:'#agentMsgs',signal:sig,files:p.files,project:p,uploaded:ing.added,userText:text,zipName:(p.name||'project').replace(/[^\w\- ]+/g,'').trim()||'project',
    system:systemPrompt('project',p),history:projectHistory(p,am,extra,imgs),persist:throttle(()=>persistProject(p))});
  }catch(e){
   if(e.name==='AbortError')am.status='stopped';
