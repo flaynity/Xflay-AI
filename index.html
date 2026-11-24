@@ -2655,11 +2655,44 @@ function startReply(sel,mid){
 }
 
 /* ---------- navigation ---------- */
+function syncNativeBack(){
+ try{
+  const cur=$('.screen.active');
+  const has=!!(S.navStack.length||(cur&&cur.id!=='screen-chat')||($('#drawer')&&$('#drawer').classList.contains('open'))||($('#modalRoot')&&$('#modalRoot').classList.contains('show'))||($('#sheetWrap')&&$('#sheetWrap').classList.contains('show'))||($('#viewer')&&$('#viewer').classList.contains('show')));
+  if(window.AndroidBridge&&typeof window.AndroidBridge.setBackStackStatus==='function')window.AndroidBridge.setBackStackStatus(has);
+ }catch(_){}
+}
 function openScreen(id,opts={}){const cur=$('.screen.active');
- if(opts.reset)S.navStack=[];else if(cur&&cur.id!==id&&cur.id!=='screen-chat')S.navStack.push(cur.id);
- $$('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');closeDrawer();}
-function goBack(){const id=S.navStack.pop()||'screen-chat';$$('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');
- if(id==='screen-project'&&S.project)renderPjAll();}
+ if(opts.reset&&id==='screen-chat')S.navStack=[];
+ else if(cur&&cur.id!==id){
+  if(S.navStack[S.navStack.length-1]!==cur.id)S.navStack.push(cur.id);
+  if(S.navStack.length>24)S.navStack.shift();
+ }
+ $$('.screen').forEach(s=>s.classList.remove('active'));
+ const tgt=document.getElementById(id);if(tgt)tgt.classList.add('active');
+ closeDrawer();syncNativeBack();}
+function goBack(){
+ const id=S.navStack.pop()||'screen-chat';
+ $$('.screen').forEach(s=>s.classList.remove('active'));
+ const tgt=document.getElementById(id)||document.getElementById('screen-chat');
+ if(tgt)tgt.classList.add('active');
+ if(id==='screen-project'&&S.project)renderPjAll();
+ if(id==='screen-projects')renderProjects();
+ syncNativeBack();}
+function executeBackAction(){
+ const ac=document.getElementById('acSheet');if(ac&&ac.classList.contains('show')){acBack();syncNativeBack();return true;}
+ const tk=document.getElementById('tkSheet');if(tk&&tk.classList.contains('show')){closeThinkSheet();syncNativeBack();return true;}
+ const src=document.getElementById('srcSheet');if(src&&src.classList.contains('show')){closeSrcSheet();syncNativeBack();return true;}
+ const vw=$('#viewer');if(vw&&vw.classList.contains('show')){closeViewer();syncNativeBack();return true;}
+ if(modalRoot&&modalRoot.classList.contains('show')){if(_modalCancel)_modalCancel();else closeModal();syncNativeBack();return true;}
+ const sw=$('#sheetWrap');if(sw&&sw.classList.contains('show')){closeSheet();syncNativeBack();return true;}
+ if(drawer&&drawer.classList.contains('open')){closeDrawer();syncNativeBack();return true;}
+ const cur=$('.screen.active');
+ if(cur&&cur.id!=='screen-chat'){goBack();return true;}
+ return false;
+}
+window.executeBackAction=executeBackAction;
+window.app=Object.assign(window.app||{},{executeBackAction});
 $$('[data-back]').forEach(b=>b.onclick=goBack);
   $$('[data-menu]').forEach(b=>b.onclick=openDrawer);
 
@@ -3682,7 +3715,7 @@ async function zipProject(p){if(typeof JSZip==='undefined')throw new Error('JSZi
  for(const[path,f]of Object.entries(p.files)){
   if(f.binary&&typeof f.content==='string'&&f.content.startsWith('data:')){zip.file(path,f.content.slice(f.content.indexOf(',')+1),{base64:true});}
   else zip.file(path,f.content||'');}
- return zip.generateAsync({type:'blob'});}
+ return zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:1}});}
 
 /* ---------- file viewer ---------- */
 function normPath(p){p=String(p||'').replace(/\\/g,'/').replace(/\/{2,}/g,'/').replace(/^\.?\//,'').trim();return p;}
@@ -4079,11 +4112,17 @@ async function startBuildTerminal(){
  terminalQueueLine('$ package project '+p.name,'cmd',false,'#btLog');
 
  try{
+  /* Pre-build auto-guard: ensure AndroidManifest has android:exported="true" on launcher Activity */
+  const mf=p.files['app/src/main/AndroidManifest.xml'];
+  if(mf&&typeof mf.content==='string'&&mf.content.includes('android.intent.action.MAIN')&&!mf.content.includes('android:exported=')){
+   mf.content=mf.content.replace(/<activity\b([^>]*?)>/i,'<activity$1 android:exported="true">');
+   terminalQueueLine('[AUTO-FIX] Added android:exported="true" to launcher Activity','ok',true,'#btLog');
+  }
   const blob=await zipProject(p);
-  terminalQueueLine('[OK] Project packaged: '+fmtBytes(blob.size),'ok',true,'#btLog');
+  terminalQueueLine('[OK] Project packaged (fast): '+fmtBytes(blob.size),'ok',true,'#btLog');
   const b64=await new Promise((r,j)=>{const fr=new FileReader();fr.onload=()=>r(String(fr.result).slice(String(fr.result).indexOf(',')+1));fr.onerror=j;fr.readAsDataURL(blob);});
-  terminalQueueLine('$ POST /build','cmd',true,'#btLog');
-  const res=await fetch(base+'/build',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:p.name,package:p.package,technology:p.tech,archiveBase64:b64}),signal:withTimeout(180000)});
+  terminalQueueLine('$ POST /build (ultra-fast mode)','cmd',true,'#btLog');
+  const res=await fetch(base+'/build',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:p.name,package:p.package,technology:p.tech,fast:true,archiveBase64:b64}),signal:withTimeout(180000)});
   
   const ct=res.headers.get('content-type')||'';let j=null;if(ct.includes('json')){try{j=await res.json()}catch(_){}}
   if(!res.ok)throw new Error(describeHttp(res.status,j?JSON.stringify(j):''));
@@ -4098,7 +4137,7 @@ async function startBuildTerminal(){
   
   const started=Date.now(),maxWait=30*60*1000;let lastStatus='';
   while(Date.now()-started<maxWait){
-   await new Promise(r=>setTimeout(r,lastStatus?'2500':'1200'));
+   await new Promise(r=>setTimeout(r,lastStatus?1200:700));
    const sr=await fetch(statusUrl,{method:'GET',headers:{Accept:'application/json'},signal:withTimeout(30000)});
    const sct=sr.headers.get('content-type')||'';let s=null;if(sct.includes('json')){try{s=await sr.json()}catch(_){}}
    if(!sr.ok)throw new Error(describeHttp(sr.status,s?JSON.stringify(s):''));
@@ -4111,16 +4150,19 @@ async function startBuildTerminal(){
    terminalRender(S._buildLogs, s.status==='failed'?'failed':s.status==='success'?'success':'running');
    
    if(!S._buildLogs){
-    if(s.status==='queued')terminalQueueLine('[QUEUE] Build queued — waiting for remote builder...','dim',true,'#btLog');
-    else if(s.status==='building')terminalQueueLine('[BUILD] Remote Builder is running...','cmd',true,'#btLog');
+    if(s.status==='queued')terminalQueueLine('[QUEUE] Build queued — starting fast builder...','dim',true,'#btLog');
+    else if(s.status==='building')terminalQueueLine('[BUILD] Compiling APK...','cmd',true,'#btLog');
    }
    
    if(s.status==='success'){
     const apkUrl=String(s.apkUrl||base+'/build/download/'+encodeURIComponent(jobId));S._apkUrl=apkUrl;
-    p.builds.unshift({at:Date.now(),ok:true,msg:'Real APK build completed successfully.'});
-    terminalQueueLine('[SUCCESS] Real APK build completed successfully.','ok',true,'#btLog');
+    const apkName=(p.name||'flay-app').replace(/[^\w\-]+/g,'-')+'-debug.apk';
+    p.builds.unshift({at:Date.now(),ok:true,msg:'APK build completed successfully.'});
+    terminalQueueLine('[SUCCESS] APK built! Downloading to Download/XFlay & opening installer...','ok',true,'#btLog');
     terminalQueueLine('[APK] '+apkUrl,'ok',true,'#btLog');
-    terminalSet('success',jobId);return;
+    terminalSet('success',jobId);
+    setTimeout(()=>downloadApkFromLink(apkUrl,apkName),250);
+    return;
    }
    
    if(s.status==='failed'){
@@ -6531,11 +6573,61 @@ function wrapUp(o,run){
  if(!String(am.content||'').trim())am.content=ch.length?'Done. The changes are listed below.':(am.status==='stopped'?'':'(no response)');
  if(am.thinkT0&&!am.thinkMs)am.thinkMs=Date.now()-am.thinkT0;
  _abAnim.add(am.id);}
+async function autoDispatchSwarm(o,run){
+ const am=o.am,sel=o.sel,sig=o.signal;
+ const lastU=[...(o.history||[])].reverse().find(x=>x&&x.role==='user');
+ const utxt=String((lastU&&lastU.text)||'').trim();
+ /* Skip swarm only for tiny 1-word greetings */
+ if(!utxt||/^(hi|hello|hey|ok|okay|thanks|thank you|bye|হাই|হ্যালো|ধন্যবাদ)[!.?\s]*$/i.test(utxt))return;
+ const isProj=o.mode==='project';
+ const fileKeys=Object.keys(run.files||{}).sort();
+ const pick=(re)=>fileKeys.filter(k=>re.test(k)).slice(0,3);
+ const specs=isProj?[
+  {name:'Agent 1',role:'Architecture & Build Config',task:'Inspect project structure, AndroidManifest.xml, and build.gradle for this request and list exact compile-safe file changes needed: '+utxt.slice(0,500),files:pick(/AndroidManifest\.xml$|build\.gradle(\.kts)?$|settings\.gradle(\.kts)?$/i)},
+  {name:'Agent 2',role:'UI & Resources',task:'Plan exact UI/layout/HTML/CSS/XML changes for this request without breaking existing views: '+utxt.slice(0,500),files:pick(/index\.html$|activity_main\.xml$|styles\.css$|strings\.xml$/i)},
+  {name:'Agent 3',role:'Core Logic & Error Guard',task:'Check MainActivity/JS/Kotlin/Java logic, imports, package name, and prevent any Gradle/compile/runtime error for: '+utxt.slice(0,500),files:pick(/MainActivity\.(java|kt)$|app\.js$|main\.js$/i)}
+ ]:[
+  {name:'Agent 1',role:'Fast Analyzer',task:'Analyze the user request, constraints, and key requirements concisely: '+utxt.slice(0,500),files:fileKeys.slice(0,2)},
+  {name:'Agent 2',role:'Core Builder',task:'Draft the exact technical solution, code changes, or answer for: '+utxt.slice(0,500),files:fileKeys.slice(0,2)},
+  {name:'Agent 3',role:'Quality & Speed Reviewer',task:'Verify edge cases, syntax, and completeness for: '+utxt.slice(0,500),files:[]}
+ ];
+ am.subAgents=specs.map(sp=>({id:uid(),name:sp.name,role:sp.role,task:sp.task,files:sp.files,touched:[],status:'running',ms:0,evId:null}));
+ if(!am.thinkT0)am.thinkT0=Date.now();
+ am._thinkTitle='Coordinating 3 parallel agents';
+ updateLive(am,sel);
+ const SUB_FAST='You are a fast specialist Flay sub-agent running in parallel with peer agents using the shared API key. Return a tight, high-signal 4-8 line technical brief (exact file paths, symbols, and fixes) with zero fluff.';
+ const jobs=am.subAgents.map(async(ag)=>{
+  const t0=Date.now();
+  let ctx='ROLE: '+ag.role+'\nPROJECT FILES: '+(fileKeys.slice(0,40).join(', ')||'(none)')+'\nTASK: '+ag.task+'\n';
+  ag.files.forEach(fp=>{const f=run.files&&run.files[fp];if(f&&!f.binary)ctx+='\n### '+fp+'\n'+String(f.content||'').slice(0,8000)+'\n';});
+  let out='',ok=true,errMsg='';
+  try{
+   await providerChat({provider:activeProvider(),messages:[{role:'system',content:SUB_FAST},{role:'user',content:ctx}],signal:sig,reasoning:'off',temperature:0.2,maxTokens:700,stream:true,onDelta:d=>{out+=d;}});
+  }catch(e){if(e.name==='AbortError')throw e;ok=false;errMsg=String(e.message||e);}
+  ag.ms=Date.now()-t0;
+  ag.status=ok?'done':'fail';
+  const ev=act(am,sel,(ok?'Completed ':'Failed ')+ag.name+' ('+ag.role+')','bot',ok?'done':'fail',{tool:'spawn_agents',req:'['+ag.name+' — '+ag.role+']\n'+ag.task,res:ok?out.slice(0,2500):('ERROR: '+errMsg)});
+  ag.evId=ev.id;
+  updateLive(am,sel);
+  return {name:ag.name,role:ag.role,ok,out:ok?out.slice(0,1200):''};
+ });
+ const res=await Promise.all(jobs);
+ const brief=res.filter(x=>x.ok&&x.out).map(x=>'['+x.name+' — '+x.role+']\n'+x.out).join('\n\n');
+ if(brief&&o.history&&o.history.length){
+  const last=o.history[o.history.length-1];
+  if(last&&last.role==='user'){
+   const tag='\n\n--- PARALLEL MULTI-AGENT BRIEF (already completed by Agent 1, Agent 2, Agent 3; use this to act immediately and finish ultra-fast) ---\n'+brief+'\n--- END BRIEF ---';
+   if(typeof last.text==='string')last.text+=tag;
+  }
+ }
+}
 async function runTask(o){
  const am=o.am;am.activity=am.activity||[];am.caAgent=true;if(o.mode==='project')am.caProject=true;
+ if(!am.thinkT0)am.thinkT0=Date.now();
+ updateLive(am,o.sel);
  const uploads=o.uploads?snapBase(o.uploads):snapBase(o.files);
  const run={files:o.files,uploads,outputs:{},tmp:{},base:snapBase(o.files),exports:[],checked:{},diffed:{},calls:0,bad:0,empty:0,lastKey:'',lastFail:false};
- try{await loop(o,run);am.status='done';}
+ try{await autoDispatchSwarm(o,run);await loop(o,run);am.status='done';}
  catch(e){if(e.name==='AbortError'){am.status='stopped';am.stopped=true;}
   else{am.status='error';console.error('Flay agent failed:',e);const msg=String(e&&e.message||e);act(am,o.sel,'Agent stopped: '+msg.slice(0,160),'alert','fail');
    am.content=(am.content?am.content+'\n\n':'')+'**The agent stopped.**\n'+msg;}}
@@ -6557,7 +6649,15 @@ function systemPrompt(mode,p,files){
   +'PATHS: workspace=/workspace  uploads=/mnt/user-data/uploads  outputs=/mnt/user-data/outputs\n'
   +'TOOLS: bash_tool, view, str_replace, create_file, present_files, spawn_agents\n'
   +'MULTI-AGENT (Hermes-style, same API key & same Project): For multi-file builds, A-Z features, or whenever the user asks for multiple agents, call spawn_agents with 2-6 parallel agents (Agent 1, Agent 2, Agent 3...). Assign each agent a STRICTLY SEPARATE non-overlapping role and file list inside the SAME project so they work concurrently without overwriting each other: TOOL_CALL: {"tool":"spawn_agents","args":{"agents":[{"name":"Agent 1","role":"UI & HTML","task":"...","files":["index.html"]},{"name":"Agent 2","role":"Styles","task":"...","files":["styles.css"]},{"name":"Agent 3","role":"Logic","task":"...","files":["app.js"]}]}}.\n'
-  +'SPEED RULE: For small/simple edits (color, text, single button, small fix), act immediately in 2-4 total tool calls (1 batched grep+sed read, 1 str_replace, 1 syntax check, present_files) with at most 2 short lines of reasoning.\n'
+  +'SPEED RULE: Use the Parallel Multi-Agent Brief already provided and act immediately in minimal tool calls (1-3 calls for small edits) with ultra-concise reasoning.\n'
+  +(mode==='project'?'ANDROID BUILD-SAFETY CONTRACT (MANDATORY — NEVER BREAK APK BUILD):\n'
+  +'1. NEVER delete or corrupt gradlew, gradle/wrapper/*, settings.gradle, or root build.gradle.\n'
+  +'2. Every .java/.kt file MUST declare the exact package matching applicationId ('+(p&&p.package||'com.xflay.app')+') and live in the exact matching folder path.\n'
+  +'3. In AndroidManifest.xml, the launcher <activity> MUST include android:exported="true" and every referenced Activity/Service/Permission/Theme/Resource MUST exist.\n'
+  +'4. ONLY import classes already in app/build.gradle dependencies or standard Android SDK (android.*, java.*). If adding any library, add its valid dependency to app/build.gradle.\n'
+  +'5. In XML files (layouts, strings.xml, themes.xml), escape & as &amp;, close every tag cleanly, and never reference undefined @id/@color/@drawable/@string.\n'
+  +'6. For WebView/HTML Android apps, build the full interactive UI/CSS/JS inside app/src/main/assets/www/index.html and keep MainActivity clean and compile-safe.\n'
+  +'7. Always verify modified files for syntax/brace/tag balance before finishing so Build APK succeeds on the first try.\n':'')
   +'PROJECT MAP:\n'+map+'\n```\n\n'
   +'If `SANDBOX: virtual-shell`, only a safe subset of commands exists (`ls`, `cat`, `head`, `tail`, `sed -n`, `grep`, `find`, `wc`, `diff`, `node --check`-style checks, `cp`, `mv`, `rm`, `zip`). If a command is not supported, the result says so. Use a supported alternative and do not claim you ran something that was not run.\n'
   +'Native tool calling is NOT available here: always write `TOOL_CALL: {...}` lines. Never write `TOOL_RESULT` yourself.\n';
