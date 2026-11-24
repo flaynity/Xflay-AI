@@ -2225,17 +2225,25 @@ function tkBrief(st){
 function tkTail(m){const t=String(m.reasoning||'').replace(/\s+/g,' ').trim();return t.length>240?t.slice(-240):t;}
 function tkFull(st){return st&&st.text?st.text.replace(/\s+/g,' ').trim():'';}
 /* What the inline row shows: only the current key step. Null when there is nothing real to show. */
+function tkShortTitle(s){
+ s=String(s||'').replace(/\s+/g,' ').replace(/^[#*\->\s]+/,'').replace(/\*+/g,'').trim();
+ if(!s)return '';
+ return s.length>68?s.slice(0,65).trim()+'\u2026':s;
+}
 function thinkView(m){
  const steps=thinkSteps(m),streaming=m.status==='streaming';
+ const hasFull=steps.length>0||!!(m.reasoning&&m.reasoning.trim());
  const doneView=()=>({live:false,can:true,title:tkSecs(m)?'Thought for '+tkSecs(m):(m.webSteps&&m.webSteps.length?'Searched the web':'Thinking'),desc:steps.length+(steps.length===1?' step':' steps')});
- if(!streaming)return steps.length?doneView():null;
- if(m._webSearching)return{live:true,can:steps.length>0,title:m._webTitle||'Searching the web\u2026',desc:m._webDesc||''};
- if(m._genCurrent)return{live:true,can:steps.length>0,title:'Generating '+m._genCurrent,desc:''};
- if(m.content){if(!steps.length)return null;if(!m._thinkEnd)m._thinkEnd=Date.now();return doneView();}
- const key=steps.filter(x=>!x.part&&x.title.length>=6);
+ if(!streaming)return hasFull?doneView():null;
+ if(m._webSearching)return{live:true,can:hasFull,title:tkShortTitle(m._webTitle)||'Searching the web\u2026',desc:''};
+ if(m._genCurrent)return{live:true,can:hasFull,title:'Generating '+m._genCurrent,desc:''};
+ if(m.content&&!m.caAgent){if(!hasFull)return null;if(!m._thinkEnd)m._thinkEnd=Date.now();return doneView();}
+ const headed=steps.filter(x=>x.head&&x.title&&x.title.length>=4);
+ const key=headed.length?headed:steps.filter(x=>!x.part&&x.title&&x.title.length>=4);
  const last=key[key.length-1];
- if(last)return{live:true,can:true,title:last.title,desc:tkFull(last)};
- return{live:true,can:steps.length>0,title:'Thinking\u2026',desc:tkTail(m)};
+ const liveTitle=tkShortTitle((last&&last.title)||(m._thinkTitle)||'');
+ if(liveTitle)return{live:true,can:true,title:liveTitle,desc:''};
+ return{live:true,can:hasFull,title:'Thinking\u2026',desc:''};
 }
 function thinkRowHtml(v,enter){
  return '<div class="tk'+(v.live?' live':'')+(v.can?' can':'')+(enter?' enter':'')+'"'+(v.can?' data-think="1"':'')+' aria-live="polite"><div class="tk-rail">'+TK_ORB+'<span class="tk-line"></span></div><div class="tk-txt"><div class="tk-t">'+esc(v.title)+'</div><div class="tk-dw'+(v.desc?' on':'')+'"><div class="tk-d">'+esc(v.desc)+'</div></div></div></div>';
@@ -2283,7 +2291,8 @@ function renderThinkSheet(m,first){
  const list=el.querySelector('.tk-list');
  const steps=thinkSteps(m),streaming=m.status==='streaming';
  const liveIdx=(streaming&&!m.content&&!m._genCurrent)?steps.length-1:-1;
- const items=steps.map((st,i)=>({t:st.title,d:st.text,live:i===liveIdx||(!!m._webSearching&&i===(m.webSteps||[]).length-1),srcs:st.srcs}));
+ let items=steps.map((st,i)=>({t:st.title,d:st.text,live:i===liveIdx||(!!m._webSearching&&i===(m.webSteps||[]).length-1),srcs:st.srcs}));
+ if(!items.length&&m.reasoning&&m.reasoning.trim())items=[{t:'Thinking',d:m.reasoning.trim(),live:streaming,srcs:[]}];
  if(m._genCurrent)items.push({t:'Generating '+m._genCurrent,d:'',live:true});
  const near=list.scrollHeight-list.scrollTop-list.clientHeight<70;
  items.forEach((it,i)=>{
@@ -2309,7 +2318,7 @@ function openThinkSheet(mid){
  let el=document.getElementById('tkSheet');
  if(!el){
   el=document.createElement('div');el.id='tkSheet';el.className='tk-sheet';
-  el.innerHTML='<div class="tk-scrim" data-tkc="1"></div><div class="tk-panel" role="dialog" aria-label="Thinking steps"><div class="tk-grip-wrap"><div class="tk-grip"></div></div><div class="tk-h">Steps</div><div class="tk-list"></div></div>';
+  el.innerHTML='<div class="tk-scrim" data-tkc="1"></div><div class="tk-panel" role="dialog" aria-label="Thinking steps"><div class="tk-grip-wrap"><div class="tk-grip"></div></div><div class="tk-h">Thinking Summary</div><div class="tk-list"></div></div>';
   document.body.appendChild(el);
   el.addEventListener('click',e=>{if(e.target.hasAttribute('data-tkc'))closeThinkSheet();});
   const panel=el.querySelector('.tk-panel');let y0=null,dy=0;
@@ -2380,8 +2389,9 @@ function renderActSheet(m){
   _ac.view='list';}
  det.hidden=true;list.hidden=false;ttl.textContent='Summary';back.innerHTML=icon('x');
  const near=list.scrollHeight-list.scrollTop-list.clientHeight<80,top=list.scrollTop;
- const liveRow=m.status==='streaming'?'<div class="cl-it say live-think"><div class="cl-bar"><span class="cl-dot live"></span><span class="cl-vl"></span></div><div class="cl-body"><div class="cl-sd live">Thinking</div></div></div>':'';
- list.innerHTML=clEvs(m).map(clItem).join('')+liveRow;
+ const actOnly=clEvs(m).filter(x=>x.kind!=='think');
+ const liveRow=m.status==='streaming'?'<div class="cl-it say live-think"><div class="cl-bar"><span class="cl-dot live"></span><span class="cl-vl"></span></div><div class="cl-body"><div class="cl-sd live">Working...</div></div></div>':'';
+ list.innerHTML=(actOnly.length?actOnly.map(clItem).join(''):(!m.status||m.status!=='streaming'?'<div class="cl-it say"><div class="cl-bar"><span class="cl-dot"></span></div><div class="cl-body"><div class="cl-sd">No commands or tool runs yet.</div></div></div>':''))+liveRow;
  list.scrollTop=(near&&m.status==='streaming')?list.scrollHeight:top;
 }
 function acPush(){try{history.pushState({acs:1},'');_ac.d++;}catch(e){}}
@@ -2517,16 +2527,18 @@ function activityCard(m){
  }
  if(typeof _ac!=='undefined'&&_ac.mid===m.id&&_ac.kind==='act')setTimeout(()=>renderActSheet(m),0);
  return '<div class="card act cl-feed">'+out.join('')+'</div>';}
+const MENU_AGENT_ICO='<svg class="ag-bot-svg" viewBox="0 0 24 24" fill="none" aria-hidden="true"><defs><linearGradient id="agMenuGrad" gradientUnits="userSpaceOnUse" x1="2" y1="2" x2="22" y2="22"><stop offset="0%" stop-color="#FF3D8B"/><stop offset="100%" stop-color="#9B4DFF"/></linearGradient></defs><path d="M12 4.2v2.2" stroke="url(#agMenuGrad)" stroke-width="2.2" stroke-linecap="round"/><circle cx="12" cy="3" r="1.1" fill="url(#agMenuGrad)"/><rect x="4.6" y="6.8" width="14.8" height="12.6" rx="4.6" stroke="url(#agMenuGrad)" stroke-width="2.2"/><rect x="1.5" y="11.4" width="1.9" height="4.2" rx=".95" fill="url(#agMenuGrad)"/><rect x="20.6" y="11.4" width="1.9" height="4.2" rx=".95" fill="url(#agMenuGrad)"/><circle cx="9.2" cy="13.1" r="1.4" fill="url(#agMenuGrad)"/><circle cx="14.8" cy="13.1" r="1.4" fill="url(#agMenuGrad)"/></svg>';
 function agentsCard(m){
  const list=m&&m.subAgents;if(!list||!list.length)return '';
  const done=list.filter(a=>a.status==='done').length,run=list.some(a=>a.status==='running');
- const rows=list.map(a=>{
+ const rows=list.map((a,i)=>{
   const st=a.status||'running';
-  const ic=st==='running'?'<span class="cl-dots ag-dots"><i></i><i></i><i></i></span>':st==='done'?icon('check','sm st-done'):icon('alert','sm st-fail');
-  const tag=st==='running'?'Running...':st==='done'?(a.ms?(a.ms/1000).toFixed(1)+'s':'Done'):'Failed';
-  return '<div class="ag-row '+st+'"'+(a.evId?' data-clev="'+a.evId+'" data-cln="1"':'')+'>'+ic+'<div class="ag-tx"><b>'+(st==='running'?'Running ':'')+esc(a.name)+'</b>'+(a.role?'<span>'+esc(a.role)+'</span>':'')+'</div><span class="ag-st '+st+'">'+esc(tag)+'</span>'+icon('chev-r','xs ag-ch')+'</div>';
+  const badge='<span class="ag-ico-wrap '+st+'">'+MENU_AGENT_ICO+(st==='running'?'<i class="ag-ring"></i>':'')+'</span>';
+  const right=st==='running'?'<span class="ag-wave" aria-hidden="true"><i></i><i></i><i></i></span><span class="ag-st running">Running</span>':st==='done'?icon('check','xs st-done')+'<span class="ag-st done">'+(a.ms?(a.ms/1000).toFixed(1)+'s':'Done')+'</span>':icon('alert','xs st-fail')+'<span class="ag-st fail">Failed</span>';
+  const sub=(a.touched&&a.touched.length)?(a.role+' \u00b7 '+a.touched.slice(0,2).join(', ')):(a.role||'');
+  return '<div class="ag-row '+st+'" style="--ag-i:'+i+'"'+(a.evId?' data-clev="'+a.evId+'" data-cln="1"':'')+'>'+badge+'<div class="ag-tx"><b class="'+(st==='running'?'ag-shimmer':'')+'">'+(st==='running'?'Running ':'')+esc(a.name)+'</b>'+(sub?'<span>'+esc(sub)+'</span>':'')+'</div><div class="ag-r">'+right+icon('chev-r','xs ag-ch')+'</div></div>';
  }).join('');
- return '<div class="ag-swarm'+(run?' live':'')+'"><div class="ag-head">'+icon('bot','sm')+'<span>Multi-Agent Swarm</span><b>'+done+'/'+list.length+'</b></div><div class="ag-list">'+rows+'</div></div>';
+ return '<div class="ag-swarm'+(run?' live':'')+'"><div class="ag-head"><span class="ag-head-ico">'+MENU_AGENT_ICO+'</span><span class="ag-head-t">'+(run?'Running '+list.length+' Parallel Agents':'Multi-Agent Swarm')+'</span><b class="ag-pill'+(run?' live':'')+'">'+done+'/'+list.length+'</b></div><div class="ag-list">'+rows+'</div></div>';
 }
 function genCard(m){
  const gf=m.generatedFiles||[];if(!gf.length||m.ops)return '';
@@ -2561,9 +2573,10 @@ function msgHtml(m){
     ${long?'<button class="more-btn" data-more>More</button>':''}
   </div>`;}
  return `<div class="msg ai${m.caAgent?' ca-msg':''}" data-mid="${m.id}">
-  ${thinkRow(m)}${m.caAgent?'':wkHtml(m)}
-  ${genCard(m)}
+  ${thinkRow(m)}
   ${m.subAgents&&m.subAgents.length?agentsCard(m):''}
+  ${m.caAgent?'':wkHtml(m)}
+  ${genCard(m)}
   ${(m.activity&&m.activity.length)||(m.caAgent&&m.status==='streaming')?activityCard(m):''}
   <div class="ai-bubble">
     <div class="msg-body">${m.content?md(m.content,m):''}${m.status==='streaming'&&m.content?'<span class="caret"></span>':''}</div>
@@ -2583,7 +2596,7 @@ function updateLive(m,hostSel){
    body.querySelectorAll(SC).forEach((e,i)=>{if(e.closest('.pcard,.codeblock').classList.contains('open')){e.scrollTop=e.scrollHeight;e.scrollLeft=0;}else if(_ps[i]){e.scrollTop=_ps[i][0];e.scrollLeft=_ps[i][1];}});}
   if(m.status==='streaming'&&m._vis!==undefined&&m._vis<String(m.content||'').length)updateLive(m,hostSel);
   patchThinkRow(mel,m);if(!m.caAgent)patchWk(mel,m);
-  if(m.subAgents&&m.subAgents.length){const w=document.createElement('div');w.innerHTML=agentsCard(m);const oldAg=mel.querySelector('.ag-swarm');if(oldAg)oldAg.replaceWith(w.firstElementChild);else{const actEl=mel.querySelector('.card.act')||mel.querySelector('.ai-bubble');if(actEl)actEl.before(w.firstElementChild);}}
+  if(m.subAgents&&m.subAgents.length){const w=document.createElement('div');w.innerHTML=agentsCard(m);const oldAg=mel.querySelector('.ag-swarm');if(oldAg)oldAg.replaceWith(w.firstElementChild);else{const tkEl=mel.querySelector(':scope > .tk');if(tkEl)tkEl.after(w.firstElementChild);else mel.prepend(w.firstElementChild);}}
   if(m.generatedFiles&&m.generatedFiles.length&&!m.ops){const sig=m.generatedFiles.map(g=>g.status).join('|');let gc=mel.querySelector('.card.gen');
    if(!gc){const w=document.createElement('div');w.innerHTML=genCard(m);const bEl=mel.querySelector('.ai-bubble')||body;bEl&&bEl.before(w.firstElementChild);}
    else if(gc.dataset.gsig!==sig){const w=document.createElement('div');w.innerHTML=genCard(m);gc.replaceWith(w.firstElementChild);}}
@@ -3120,7 +3133,7 @@ function threadClick(sel){return e=>{
   else if(g&&g.deleted)toast('This file was deleted — no content to preview.','warn');
   return;}
  const chg=e.target.closest('.chg-row');if(chg){const d=chg.nextElementSibling;if(d)d.classList.toggle('hidden');return;}
- const tkr=e.target.closest('[data-think]');if(tkr){const me=tkr.closest('[data-mid]');if(me){const tm=findThinkMsg(me.dataset.mid);if(tm&&tm.caAgent)openActSheet(me.dataset.mid,'act');else openThinkSheet(me.dataset.mid);}return;}
+ const tkr=e.target.closest('[data-think]');if(tkr){const me=tkr.closest('[data-mid]');if(me){openThinkSheet(me.dataset.mid);}return;}
  const head=e.target.closest('.card .card-head');
  if(head&&!e.target.closest('button')){const card=head.closest('.card');
   card.classList.toggle('collapsed');
@@ -4848,36 +4861,12 @@ $('#agentMsgs').addEventListener('click',e=>{const r=e.target.closest('[data-ret
   color: var(--v-ink) !important;
 }
 
-/* Solid clean top bar so scrolled chat text never bleeds behind Menu / New Chat buttons */
+/* Agents Chat top bar: keep original premium gradient Menu & New Chat buttons cleanly above scroll */
 #screen-chat .ftop {
-  background: var(--v-bg) !important;
-  border-bottom: 1px solid var(--v-border) !important;
-  padding: calc(10px + env(safe-area-inset-top)) 14px 10px !important;
+  background: linear-gradient(180deg, var(--v-bg) 72%, transparent 100%) !important;
+  border-bottom: 0 !important;
+  padding: calc(12px + env(safe-area-inset-top)) 16px 12px !important;
   box-shadow: none !important;
-}
-html #screen-chat .ftop > #btnMenu,
-html #screen-chat .ftop > #btnNewChat {
-  width: 42px !important;
-  height: 42px !important;
-  min-width: 42px !important;
-  min-height: 42px !important;
-  flex: 0 0 42px !important;
-  border: 0 !important;
-  border-radius: 50% !important;
-  background: transparent !important;
-  background-image: none !important;
-  box-shadow: none !important;
-}
-html #screen-chat .ftop > #btnMenu:active,
-html #screen-chat .ftop > #btnNewChat:active {
-  background: var(--v-bubble) !important;
-  box-shadow: none !important;
-}
-html #screen-chat .ftop > #btnMenu .ic,
-html #screen-chat .ftop > #btnNewChat .ic {
-  color: var(--v-ink) !important;
-  width: 22px !important;
-  height: 22px !important;
 }
 
 /* Drawer Theme Switch pill */
@@ -5032,13 +5021,41 @@ html #screen-chat .ftop > #btnNewChat .ic {
   animation: tkcross .4s ease;
 }
 
-/* Hermes-style Multi-Agent Swarm Card */
+/* Hermes-style Multi-Agent Swarm Card with Premium Animation & Menu Agent Icon */
+@keyframes agRowIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes agPulseRing {
+  0% { transform: scale(.86); opacity: .75; }
+  70% { transform: scale(1.26); opacity: 0; }
+  100% { transform: scale(1.26); opacity: 0; }
+}
+@keyframes agShimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: -100% 50%; }
+}
+@keyframes agWaveBar {
+  0%, 100% { transform: scaleY(.35); opacity: .55; }
+  50% { transform: scaleY(1); opacity: 1; }
+}
+@keyframes agBorderGlow {
+  0%, 100% { box-shadow: 0 4px 20px rgba(155,77,255,0.14), 0 0 0 1px rgba(255,61,139,0.22); }
+  50% { box-shadow: 0 6px 26px rgba(255,61,139,0.24), 0 0 0 1px rgba(155,77,255,0.42); }
+}
 .ag-swarm {
-  margin: 6px 0 12px;
+  margin: 4px 0 12px;
   border-radius: 18px;
-  border: 1px solid var(--v-border, var(--border));
+  border: 1.5px solid var(--v-border, var(--border));
   background: var(--v-surface, var(--surface));
   overflow: hidden;
+  transition: box-shadow .3s ease, border-color .3s ease;
+}
+.ag-swarm.live {
+  border-color: transparent;
+  background: linear-gradient(var(--v-surface, var(--surface)), var(--v-surface, var(--surface))) padding-box,
+              linear-gradient(135deg, #FF3D8B 0%, #9B4DFF 50%, #3B82F6 100%) border-box;
+  animation: agBorderGlow 2.4s ease-in-out infinite;
 }
 .ag-head {
   display: flex;
@@ -5049,28 +5066,99 @@ html #screen-chat .ftop > #btnNewChat .ic {
   font-weight: 700;
   color: var(--v-ink, var(--text));
   border-bottom: 1px solid var(--v-border, var(--border));
+  background: linear-gradient(90deg, rgba(255,61,139,0.06), rgba(155,77,255,0.06), transparent);
 }
-.ag-head .ic { color: var(--v-rust, #D97757); }
-.ag-head b { margin-left: auto; font-size: 12px; color: var(--v-ink2, var(--text2)); }
+.ag-head-ico {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+.ag-head-ico .ag-bot-svg { width: 22px; height: 22px; display: block; }
+.ag-head-t { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ag-pill {
+  margin-left: auto;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--v-bubble, rgba(155,77,255,0.12));
+  color: var(--v-ink2, var(--text2));
+}
+.ag-pill.live {
+  background: linear-gradient(135deg, rgba(255,61,139,0.16), rgba(155,77,255,0.18));
+  color: #D946EF;
+}
 .ag-list { display: flex; flex-direction: column; }
 .ag-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 11px;
   padding: 10px 14px;
   border-bottom: 1px solid var(--v-border, var(--border));
   cursor: pointer;
+  animation: agRowIn .32s cubic-bezier(.2,.9,.25,1) both;
+  animation-delay: calc(var(--ag-i, 0) * 55ms);
 }
 .ag-row:last-child { border-bottom: 0; }
 .ag-row:active { background: var(--v-bubble, rgba(255,255,255,0.04)); }
-.ag-tx { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.ag-tx b { font-size: 14.5px; font-weight: 600; color: var(--v-ink, var(--text)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ag-tx span { font-size: 12.5px; color: var(--v-ink2, var(--text2)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ag-ico-wrap {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  border-radius: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  background: linear-gradient(135deg, rgba(255,61,139,0.12), rgba(155,77,255,0.14));
+  border: 1px solid rgba(155,77,255,0.22);
+}
+.ag-ico-wrap .ag-bot-svg { width: 20px; height: 20px; display: block; position: relative; z-index: 1; }
+.ag-ico-wrap .ag-ring {
+  position: absolute;
+  inset: -3px;
+  border-radius: 13px;
+  border: 1.5px solid #FF3D8B;
+  animation: agPulseRing 1.6s cubic-bezier(.2,.8,.2,1) infinite;
+  pointer-events: none;
+}
+.ag-tx { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ag-tx b { font-size: 14.5px; font-weight: 650; color: var(--v-ink, var(--text)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ag-tx b.ag-shimmer {
+  background: linear-gradient(90deg, var(--v-ink, #1F1E1D) 18%, #FF3D8B 46%, #9B4DFF 56%, var(--v-ink, #1F1E1D) 82%);
+  background-size: 240% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: agShimmer 2.1s linear infinite;
+}
+.ag-tx span { font-size: 12.2px; color: var(--v-ink2, var(--text2)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ag-r { display: inline-flex; align-items: center; gap: 6px; flex: none; }
+.ag-wave { display: inline-flex; align-items: flex-end; gap: 2px; height: 13px; }
+.ag-wave i {
+  width: 2.5px;
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #FF3D8B, #9B4DFF);
+  animation: agWaveBar .95s ease-in-out infinite;
+}
+.ag-wave i:nth-child(2) { animation-delay: .18s; }
+.ag-wave i:nth-child(3) { animation-delay: .36s; }
 .ag-st { font-size: 12px; font-weight: 600; color: var(--v-muted, var(--text2)); flex: none; }
-.ag-st.running { color: var(--v-rust, #D97757); }
+.ag-st.running { color: #D946EF; }
 .ag-st.done { color: var(--ok); }
 .ag-st.fail { color: var(--err); }
 .ag-ch { color: var(--v-muted, var(--text2)); flex: none; }
+
+/* Thinking Summary sheet (#tkSheet) light & dark polish */
+#tkSheet .tk-panel { background: var(--v-surface, var(--surface)) !important; color: var(--v-ink, var(--text)) !important; }
+#tkSheet .tk-h { color: var(--v-ink, var(--text)) !important; border-bottom-color: var(--v-border, var(--border)) !important; }
+#tkSheet .tk-st { color: var(--v-ink, var(--text)) !important; }
+#tkSheet .tk-sd { color: var(--v-ink2, var(--text2)) !important; white-space: pre-wrap; }
+#tkSheet .tk-grip { background: var(--v-border, rgba(128,128,128,.35)) !important; }
 
 /* File / Export card */
 #screen-chat .ca-dl.code-card,
@@ -5266,7 +5354,7 @@ section.screen .topbar>button.ibtn[data-menu]:active{
 </style>
 <style id="flay-agents-remove-statusbar-shadow">
 /* Remove the dark fade/shadow beneath the Android status bar on Agents page */
-#screen-chat .ftop{background:transparent!important;box-shadow:none!important;filter:none!important}
+#screen-chat .ftop{box-shadow:none!important;filter:none!important}
 </style>
 <style id="flay-new-chat-right-alignment">
 /* Keep Menu at the left and move New Chat to the far right */
@@ -6264,7 +6352,7 @@ function syncThinkTitles(am,sel){
 async function step(o,L){
  const am=o.am,sel=o.sel,ctl=new AbortController();let buf='',cut=false,idleT=0;
  const onAb=()=>ctl.abort();o.signal.addEventListener('abort',onAb,{once:true});
- am.content='';am._slowNotice=false;am._liveLabel='';
+ am.content='';am._slowNotice=false;am._liveLabel='';if(am.reasoning&&!am.reasoning.endsWith('\n\n'))am.reasoning+='\n\n';
  const armIdle=()=>{clearTimeout(idleT);idleT=setTimeout(()=>{if(am.status==='streaming'&&!am._slowNotice){am._slowNotice=true;swapAct(am,sel);}},14000);};
  const touchProg=()=>{if(am._slowNotice){am._slowNotice=false;swapAct(am,sel);}armIdle();};
  armIdle();
@@ -6272,7 +6360,7 @@ async function step(o,L){
    onDelta:d=>{touchProg();buf+=d;const v=visible(buf);if(v!==am.content){am.content=v;updateLive(am,sel);}
     if(am._liveLabel!=='Running command'&&/"tool"\s*:\s*"bash_tool"/.test(buf)){am._liveLabel='Running command';swapAct(am,sel);}
     if(!cut&&/(^|\n)[ \t]*TOOL_RESULT\s*:/i.test(buf)){cut=true;ctl.abort();}},
-   onReasoning:r=>{touchProg();if(!am.thinkT0)am.thinkT0=Date.now();am.reasoning=((am.reasoning||'')+r).slice(-20000);syncThinkTitles(am,sel);updateLive(am,sel);},
+   onReasoning:r=>{touchProg();if(!am.thinkT0)am.thinkT0=Date.now();am.reasoning=((am.reasoning||'')+r).slice(-32000);syncThinkTitles(am,sel);updateLive(am,sel);},
    onRetry:why=>{buf='';am.reasoning='';am.thinkT0=0;am._slowNotice=true;act(am,sel,'Model was slow ('+why+'), retrying with faster thinking','alert','warn');}});}
  catch(e){if(!(e.name==='AbortError'&&cut&&!o.signal.aborted))throw e;}
  finally{clearTimeout(idleT);o.signal.removeEventListener('abort',onAb);}
@@ -6291,48 +6379,80 @@ function narrate(am,sel,pre){
  pre=String(pre||'').trim();if(!pre)return;
  am.activity.push({id:uid(),ts:Date.now(),taskId:am.id,kind:'say',icon:'info',label:pre.split('\n')[0].slice(0,140),text:pre.slice(0,2500),status:'done',new:true});swapAct(am,sel);}
 
-/* ---------- Hermes-style parallel multi-agent runner ---------- */
+/* ---------- Hermes-style parallel multi-agent runner (same API key, same Project, separate tasks) ---------- */
 async function runSpawnAgents(o,run,a){
  const am=o.am,sel=o.sel,sig=o.signal;
- const specs=Array.isArray(a.agents)?a.agents.slice(0,4):[];
- if(!specs.length)return E('spawn_agents requires an "agents" array of 1 to 4 objects: [{"name":"Agent 1","role":"...","task":"...","files":[...]}].');
- am.subAgents=specs.map((sp,i)=>({
+ const specs=Array.isArray(a.agents)?a.agents.slice(0,6):[];
+ if(!specs.length)return E('spawn_agents requires an "agents" array of 1 to 6 objects: [{"name":"Agent 1","role":"...","task":"...","files":[...]}].');
+ const prevList=Array.isArray(am.subAgents)?am.subAgents:[];
+ const batch=specs.map((sp,i)=>({
   id:uid(),
-  name:String(sp.name||('Agent '+(i+1))),
+  name:String(sp.name||('Agent '+(prevList.length+i+1))),
   role:String(sp.role||sp.task||'Sub-agent').slice(0,70),
   task:String(sp.task||''),
-  files:Array.isArray(sp.files)?sp.files.slice(0,6):[],
+  files:Array.isArray(sp.files)?sp.files.slice(0,8):[],
+  touched:[],
   status:'running',ms:0,evId:null
  }));
+ am.subAgents=prevList.concat(batch);
  updateLive(am,sel);
- const SUB_SYS='You are a specialized Flay sub-agent running in parallel with other agents. Be ultra-fast, concise, and exact. Do not chat. If your task asks to create new file(s) or propose exact str_replace edits, return a JSON block ```json\n{"summary":"...","files":[{"path":"...","content":"..."}],"edits":[{"path":"...","old_str":"...","new_str":"..."}]}\n``` otherwise return concise, verified findings directly.';
- const jobs=am.subAgents.map(async(ag,idx)=>{
+ const projFiles=Object.keys(run.files||{}).sort().slice(0,60).join(', ')||'(empty project)';
+ const SUB_SYS='You are a specialized Flay sub-agent working in parallel with peer agents on the SAME project using the shared API key. Each agent has a SEPARATE, non-overlapping responsibility. Only create or modify files belonging to your assigned task — never touch peer agents\x27 files. Be ultra-fast, exact, and production-ready. When creating/updating files or making str_replace edits in the shared project, return a JSON block ```json\n{"summary":"...","files":[{"path":"...","content":"...","overwrite":false}],"edits":[{"path":"...","old_str":"...","new_str":"..."}]}\n``` otherwise return concise verified findings directly.';
+ const jobs=batch.map(async(ag)=>{
   const t0=Date.now();
-  let ctx='ROLE: '+ag.role+'\nTASK:\n'+ag.task+'\n';
+  const peers=batch.filter(x=>x.id!==ag.id).map(x=>'- '+x.name+' ('+x.role+'): '+x.task.slice(0,120)+(x.files.length?' [files: '+x.files.join(', ')+']':'')).join('\n');
+  let ctx='AGENT: '+ag.name+'\nROLE: '+ag.role+'\nSHARED PROJECT FILES: '+projFiles+'\n';
+  if(peers)ctx+='PEER AGENTS RUNNING IN PARALLEL (DO NOT DUPLICATE THEIR WORK OR EDIT THEIR FILES):\n'+peers+'\n';
+  ctx+='YOUR EXCLUSIVE TASK:\n'+ag.task+'\n';
+  const ownedSet=new Set();
   ag.files.forEach(fp=>{
    const v=resolveVPath(run,fp,'/workspace');
+   if(v.rel)ownedSet.add(v.rel);
    const f=v.store&&v.store[v.rel];
-   if(f&&!f.binary)ctx+='\n### FILE: '+v.rel+'\n'+String(f.content||'').slice(0,18000)+'\n### END\n';
+   if(f&&!f.binary)ctx+='\n### FILE: '+v.rel+'\n'+String(f.content||'').slice(0,22000)+'\n### END\n';
   });
-  let out='',ok=true,errMsg='';
+  let out='',ok=true,errMsg='',chkNotes=[];
   try{
-   await providerChat({provider:activeProvider(),messages:[{role:'system',content:SUB_SYS},{role:'user',content:ctx}],signal:sig,reasoning:'off',temperature:0.3,maxTokens:4096,stream:true,onDelta:d=>{out+=d;}});
-   /* Apply non-conflicting structured file creations or edits if returned */
+   await providerChat({provider:activeProvider(),messages:[{role:'system',content:SUB_SYS},{role:'user',content:ctx}],signal:sig,reasoning:'off',temperature:0.25,maxTokens:6144,stream:true,onDelta:d=>{out+=d;}});
    const jm=out.match(/```json\s*([\s\S]*?)```/);
    if(jm){
     try{
      const parsed=JSON.parse(jm[1]);
-     if(Array.isArray(parsed.files))parsed.files.forEach(fl=>{if(fl&&fl.path&&typeof fl.content==='string'){const v=resolveVPath(run,fl.path,'/workspace');if(v.store&&!v.ro&&!badPath(v.rel)&&!v.store[v.rel]){v.store[v.rel]={content:fl.content};ag.mut=true;}}});
-     if(Array.isArray(parsed.edits))parsed.edits.forEach(ed=>{if(ed&&ed.path&&typeof ed.old_str==='string'&&typeof ed.new_str==='string'){const rr=tReplace(run,{path:ed.path,old_str:ed.old_str,new_str:ed.new_str,description:ag.name+': edit '+ed.path});if(rr.ok)ag.mut=true;}});
+     if(Array.isArray(parsed.files))parsed.files.forEach(fl=>{
+      if(fl&&fl.path&&typeof fl.content==='string'){
+       const v=resolveVPath(run,fl.path,'/workspace');
+       if(v.store&&!v.ro&&!badPath(v.rel)){
+        const canWrite=!v.store[v.rel]||fl.overwrite===true||ownedSet.has(v.rel);
+        if(canWrite){
+         v.store[v.rel]={content:fl.content};
+         ag.mut=true;
+         if(!ag.touched.includes(v.rel))ag.touched.push(v.rel);
+         const ex=(v.rel.split('.').pop()||'').toLowerCase();
+         let ce='';
+         if(ex==='js'||ex==='mjs')ce=chkJs(fl.content);
+         else if(ex==='css')ce=chkCss(fl.content);
+         else if(ex==='json')ce=chkJson(fl.content);
+         else if(ex==='html'||ex==='htm')ce=chkHtml(fl.content);
+         if(ce)chkNotes.push(v.rel+': '+ce);
+        }
+       }
+      }
+     });
+     if(Array.isArray(parsed.edits))parsed.edits.forEach(ed=>{
+      if(ed&&ed.path&&typeof ed.old_str==='string'&&typeof ed.new_str==='string'){
+       const rr=tReplace(run,{path:ed.path,old_str:ed.old_str,new_str:ed.new_str,description:ag.name+': edit '+ed.path});
+       if(rr.ok){ag.mut=true;const v=resolveVPath(run,ed.path,'/workspace');if(v.rel&&!ag.touched.includes(v.rel))ag.touched.push(v.rel);}
+      }
+     });
     }catch(_){}
    }
   }catch(e){if(e.name==='AbortError')throw e;ok=false;errMsg=String(e.message||e);}
   ag.ms=Date.now()-t0;
   ag.status=ok?'done':'fail';
-  const ev=act(am,sel,(ok?'Completed ':'Failed ')+ag.name+' ('+ag.role+')','bot',ok?'done':'fail',{tool:'spawn_agents',req:'['+ag.name+' — '+ag.role+']\n'+ag.task,res:ok?out.slice(0,3000):('ERROR: '+errMsg)});
+  const ev=act(am,sel,(ok?'Completed ':'Failed ')+ag.name+' ('+ag.role+')','bot',ok?'done':'fail',{tool:'spawn_agents',req:'['+ag.name+' — '+ag.role+']\n'+ag.task+(ag.files.length?'\nFiles: '+ag.files.join(', '):''),res:ok?(out.slice(0,3000)+(chkNotes.length?'\n\n[Check warnings]\n'+chkNotes.join('\n'):'')):('ERROR: '+errMsg)});
   ag.evId=ev.id;
   updateLive(am,sel);
-  return{name:ag.name,role:ag.role,ok,ms:ag.ms,output:ok?out.slice(0,4000):('ERROR: '+errMsg),mut:!!ag.mut};
+  return{name:ag.name,role:ag.role,ok,ms:ag.ms,touched:ag.touched,warnings:chkNotes,output:ok?out.slice(0,3500):('ERROR: '+errMsg),mut:!!ag.mut};
  });
  const res=await Promise.all(jobs);
  const anyMut=res.some(x=>x.mut);
@@ -6436,7 +6556,7 @@ function systemPrompt(mode,p,files){
   +'COMMAND TIMEOUT: default 60s, max 300s\n'
   +'PATHS: workspace=/workspace  uploads=/mnt/user-data/uploads  outputs=/mnt/user-data/outputs\n'
   +'TOOLS: bash_tool, view, str_replace, create_file, present_files, spawn_agents\n'
-  +'MULTI-AGENT (Hermes-style): For large A-Z builds or multi-file tasks, call spawn_agents with 2-4 parallel agents: TOOL_CALL: {"tool":"spawn_agents","args":{"agents":[{"name":"Agent 1","role":"...","task":"...","files":["..."]},{"name":"Agent 2","role":"...","task":"..."}]}}. They run concurrently for ultra-fast work.\n'
+  +'MULTI-AGENT (Hermes-style, same API key & same Project): For multi-file builds, A-Z features, or whenever the user asks for multiple agents, call spawn_agents with 2-6 parallel agents (Agent 1, Agent 2, Agent 3...). Assign each agent a STRICTLY SEPARATE non-overlapping role and file list inside the SAME project so they work concurrently without overwriting each other: TOOL_CALL: {"tool":"spawn_agents","args":{"agents":[{"name":"Agent 1","role":"UI & HTML","task":"...","files":["index.html"]},{"name":"Agent 2","role":"Styles","task":"...","files":["styles.css"]},{"name":"Agent 3","role":"Logic","task":"...","files":["app.js"]}]}}.\n'
   +'SPEED RULE: For small/simple edits (color, text, single button, small fix), act immediately in 2-4 total tool calls (1 batched grep+sed read, 1 str_replace, 1 syntax check, present_files) with at most 2 short lines of reasoning.\n'
   +'PROJECT MAP:\n'+map+'\n```\n\n'
   +'If `SANDBOX: virtual-shell`, only a safe subset of commands exists (`ls`, `cat`, `head`, `tail`, `sed -n`, `grep`, `find`, `wc`, `diff`, `node --check`-style checks, `cp`, `mv`, `rm`, `zip`). If a command is not supported, the result says so. Use a supported alternative and do not claim you ran something that was not run.\n'
