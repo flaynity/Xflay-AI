@@ -2332,7 +2332,7 @@ function clToolIcon(x){
  return icon('term-box','sm');
 }
 function clItem(x){
- if(x.kind==='say')return '<div class="cl-it say"><div class="cl-bar"><span class="cl-dot"></span><span class="cl-vl"></span></div><div class="cl-body"><div class="cl-sd">'+esc(String(x.text||x.label).replace(/`/g,''))+'</div></div></div>';
+ if(x.kind==='say'||x.kind==='think')return '<div class="cl-it say'+(x.kind==='think'?' think-h':'')+'"><div class="cl-bar"><span class="cl-dot"></span><span class="cl-vl"></span></div><div class="cl-body"><div class="cl-sd">'+esc(String(x.kind==='think'?x.label:(x.text||x.label)).replace(/`/g,''))+'</div></div></div>';
  const sub=[x.path,x.status==='fail'?x.detail:''].filter(Boolean).join('\n');
  const plain=(x.tool==='create_file'||x.icon==='fileplus')?' plain':'';
  return '<div class="cl-it tool'+(x.status==='fail'?' bad':'')+(x.status==='run'?' live':'')+'" data-evid="'+x.id+'"><div class="cl-bar"><span class="cl-box'+plain+'">'+clToolIcon(x)+'</span><span class="cl-vl"></span></div><div class="cl-body"><div class="cl-headrow"><div class="cl-st">'+esc(x.label)+'</div><span class="cl-go">'+icon('chev-r','sm')+'</span></div>'+(sub?'<div class="cl-sub">'+esc(sub)+'</div>':'')+'</div></div>';}
@@ -2467,20 +2467,32 @@ function finishGen(m){
 function actSt(st){return st==='same'?icon('ok','sm muted'):st==='run'?'<span class="spin"></span>':st==='done'?icon('check','sm st-done'):st==='fail'?icon('alert','sm st-fail'):st==='warn'?icon('warn','sm st-warn'):st==='cancel'?icon('stop','sm muted'):icon('info','sm muted');}
 function actTime(ts){if(!ts)return '';try{return new Date(ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',second:'2-digit'});}catch(_){return '';}}
 function clRow(g,live,m){
- const last=g[g.length-1],run=live||g.some(x=>x.status==='run'),fails=!run&&g.some(x=>x.status==='fail'),title=(run?(g.find(x=>x.status==='run')||last):last).label;
- const still=run&&m&&m._stepT0&&(Date.now()-m._stepT0>3500);
+ const last=g[g.length-1],run=live||g.some(x=>x.status==='run'),fails=!run&&g.some(x=>x.status==='fail');
+ const activeTool=g.find(x=>x.status==='run');
+ const title=run?((m&&m._liveLabel)||(activeTool&&activeTool.label)||(m&&m._thinkTitle)||(last&&last.label)||'Thinking...'):((last&&last.label)||(m&&m._thinkTitle)||'Summary');
+ const still=!!(run&&m&&m._slowNotice);
  return '<div class="cl-row'+(run?' live':'')+(fails?' bad':'')+'" data-acsheet="act">'+(run?'<span class="cl-dots"><i></i><i></i><i></i></span>':icon(fails?'alert':'clock','sm cl-done-ic'))+'<span class="cl-t">'+esc(title)+'</span>'+icon('chev-r','sm cl-chev')+'</div>'+(still?'<div class="cl-still">Still working on it...</div>':'');}
 function activityCard(m){
  const evs=m.activity||[],live=m.status==='streaming';
- if(!evs.length){
-  if(live&&m.caAgent)return '<div class="card act cl-feed"><div class="cl-wait"><span class="cl-dots"><i></i><i></i><i></i></span></div></div>';
+ const says=evs.filter(x=>x.kind==='say');
+ const thinks=evs.filter(x=>x.kind==='think');
+ const tools=evs.filter(x=>x.kind!=='say'&&x.kind!=='think');
+ const hasAny=says.length||thinks.length||tools.length||(m&&m._liveLabel)||(m&&m._thinkTitle);
+ if(!hasAny){
+  if(live&&m.caAgent)return '<div class="card act cl-feed"><div class="cl-wait"><span class="cl-dots"><i></i><i></i><i></i></span></div>'+(m._slowNotice?'<div class="cl-still">Still working on it...</div>':'')+'</div>';
   return '';
  }
- const says=evs.filter(x=>x.kind==='say'),tools=evs.filter(x=>x.kind!=='say');
  const out=[];
  if(says.length){const firstSay=says[0];out.push('<div class="cl-say">'+md(firstSay.text||firstSay.label,m)+'</div>');}
- if(tools.length)out.push(clRow(tools,live,m));
- else if(live)out.push('<div class="cl-row live" data-acsheet="act"><span class="cl-dots"><i></i><i></i><i></i></span><span class="cl-t">'+esc(says[says.length-1].label||'Thinking...')+'</span>'+icon('chev-r','sm cl-chev')+'</div>');
+ if(tools.length){
+  out.push(clRow(tools,live,m));
+ }else{
+  const lbl=live?((m&&m._liveLabel)||(m&&m._thinkTitle)||(thinks.length?thinks[thinks.length-1].label:'Thinking...')):((thinks.length?thinks[thinks.length-1].label:(m&&m._thinkTitle))||'');
+  if(lbl){
+   const still=!!(live&&m&&m._slowNotice);
+   out.push('<div class="cl-row'+(live?' live':'')+'" data-acsheet="act">'+(live?'<span class="cl-dots"><i></i><i></i><i></i></span>':icon('clock','sm cl-done-ic'))+'<span class="cl-t">'+esc(lbl)+'</span>'+icon('chev-r','sm cl-chev')+'</div>'+(still?'<div class="cl-still">Still working on it...</div>':''));
+  }
+ }
  if(typeof _ac!=='undefined'&&_ac.mid===m.id&&_ac.kind==='act')setTimeout(()=>renderActSheet(m),0);
  return '<div class="card act cl-feed">'+out.join('')+'</div>';}
 function genCard(m){
@@ -6312,18 +6324,38 @@ async function modelCall(o){
    if(tb||stall)fast=true;
    if(o.onRetry)o.onRetry(tb?'thinking too long':stall?'no response':'server error');
    await sleep(tb?0:Math.min(1500,300*Math.pow(2,a)),o.signal);}}}
+function syncThinkTitles(am,sel){
+ const steps=thinkStepsRaw(am).filter(s=>!s.part&&s.title&&s.title.length>=4);
+ if(!steps.length)return;
+ am._seenThink=am._seenThink||[];
+ let changed=false;
+ steps.forEach(s=>{
+  const t=s.title.trim();
+  if(!am._seenThink.includes(t)){
+   am._seenThink.push(t);
+   am.activity.push({id:uid(),ts:Date.now(),taskId:am.id,kind:'think',icon:'info',label:t,text:t,status:'done',new:true});
+   changed=true;
+  }
+ });
+ const latest=steps[steps.length-1].title.trim();
+ if(am._thinkTitle!==latest){am._thinkTitle=latest;changed=true;}
+ if(changed)swapAct(am,sel);
+}
 async function step(o,L){
- const am=o.am,sel=o.sel,ctl=new AbortController();let buf='',cut=false;
+ const am=o.am,sel=o.sel,ctl=new AbortController();let buf='',cut=false,idleT=0;
  const onAb=()=>ctl.abort();o.signal.addEventListener('abort',onAb,{once:true});
- am.content='';am._stepT0=Date.now();
- const stillT=setTimeout(()=>{if(am.status==='streaming')swapAct(am,sel);},3600);
+ am.content='';am._slowNotice=false;am._liveLabel='';
+ const armIdle=()=>{clearTimeout(idleT);idleT=setTimeout(()=>{if(am.status==='streaming'&&!am._slowNotice){am._slowNotice=true;swapAct(am,sel);}},14000);};
+ const touchProg=()=>{if(am._slowNotice){am._slowNotice=false;swapAct(am,sel);}armIdle();};
+ armIdle();
  try{await modelCall({messages:build(o.system,L),signal:ctl.signal,
-   onDelta:d=>{buf+=d;const v=visible(buf);if(v!==am.content){am.content=v;updateLive(am,sel);}
+   onDelta:d=>{touchProg();buf+=d;const v=visible(buf);if(v!==am.content){am.content=v;updateLive(am,sel);}
+    if(am._liveLabel!=='Running command'&&/"tool"\s*:\s*"bash_tool"/.test(buf)){am._liveLabel='Running command';swapAct(am,sel);}
     if(!cut&&/(^|\n)[ \t]*TOOL_RESULT\s*:/i.test(buf)){cut=true;ctl.abort();}},
-   onReasoning:r=>{if(!am.thinkT0)am.thinkT0=Date.now();am.reasoning=((am.reasoning||'')+r).slice(-20000);updateLive(am,sel);},
-   onRetry:why=>{buf='';am.reasoning='';am.thinkT0=0;act(am,sel,'Model was slow ('+why+'), retrying with faster thinking','alert','warn');}});}
+   onReasoning:r=>{touchProg();if(!am.thinkT0)am.thinkT0=Date.now();am.reasoning=((am.reasoning||'')+r).slice(-20000);syncThinkTitles(am,sel);updateLive(am,sel);},
+   onRetry:why=>{buf='';am.reasoning='';am.thinkT0=0;am._slowNotice=true;act(am,sel,'Model was slow ('+why+'), retrying with faster thinking','alert','warn');}});}
  catch(e){if(!(e.name==='AbortError'&&cut&&!o.signal.aborted))throw e;}
- finally{clearTimeout(stillT);o.signal.removeEventListener('abort',onAb);}
+ finally{clearTimeout(idleT);o.signal.removeEventListener('abort',onAb);}
  return buf;}
 
 /* ---------- activity feed ---------- */
@@ -6367,9 +6399,11 @@ async function loop(o,run){
   for(let ci=0;ci<calls.length;ci++){
    const c=calls[ci];
    if(abortedBatch){results.push('[Skipped call '+(ci+1)+' ('+c.tool+') because the previous call failed.]');continue;}
+   if(c.tool==='bash_tool'){am._liveLabel='Running command';swapAct(am,sel);}
    const key=JSON.stringify(c);let r;
    if(key===run.lastKey&&run.lastFail)r=E('This exact call just failed. Change something before retrying.');
    else r=execTool(run,c);
+   am._liveLabel='';
    run.lastKey=key;run.lastFail=!r.ok;run.calls++;
    const reqText=c.tool==='bash_tool'?String((c.args&&c.args.command)||''):JSON.stringify(c.args||{},null,2);
    const resText=String(r.out||'');
@@ -6391,7 +6425,7 @@ function opsFor(b,f,act){
  const out=[];let gap=false;all.forEach((o,i)=>{if(keepIdx.has(i)){if(gap&&out.length)out.push({t:' ',s:'\u22ef'});gap=false;out.push({t:o.t,s:o.s});}else gap=true;});
  return{ops:out.slice(0,1500),plus,minus};}
 function wrapUp(o,run){
- const am=o.am;(am.activity||[]).forEach(x=>{if(x.status==='run')x.status='cancel';});
+ const am=o.am;am._liveLabel='';am._slowNotice=false;(am.activity||[]).forEach(x=>{if(x.status==='run')x.status='cancel';});
  const ch=changedList(run);
  if(ch.length){const results=[],diffs={},undo={};
   ch.forEach(c=>{results.push({path:c.path,action:c.action,ok:true});diffs[c.path]=opsFor(run.base[c.path],run.files[c.path],c.action);undo[c.path]=run.base[c.path]?{content:run.base[c.path].content,binary:!!run.base[c.path].binary}:null;});
